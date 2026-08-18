@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# ptt-install - install, re-configure, or remove the ptt voice typing stack.
+set -euo pipefail
+
+PTT_DIR="$HOME/.local/share/ptt"
+BIN_LINK="$HOME/.local/bin/ptt"
+ND_CONFIG="$HOME/.config/nerd-dictation"
+MODEL_LINK="$ND_CONFIG/model"
+MODEL_ROOT="/usr/share/vosk-models"
+HYPR_DIR="$HOME/.config/hypr"
+USER_NAME="${USER:-$(id -un)}"
+
+BASE_PKGS=(wtype nerd-dictation-git)
+
+# Model menu, best first. Index 0 is the default.
+MODEL_PKGS=(vosk-model-en-us vosk-model-en-us-lgraph vosk-model-small-en-us)
+MODEL_DIRS=(en-us en-us-lgraph small-en-us)
+MODEL_VERS=(0.22 0.22 0.15)
+MODEL_SIZES=("~1.8 GB" "~128 MB" "~40 MB")
+
+if [[ -t 1 ]]; then
+    C_RESET=$'\e[0m'
+    C_BOLD=$'\e[1m'
+    C_INFO=$'\e[34m'
+    C_WARN=$'\e[33m'
+    C_ERROR=$'\e[31m'
+else
+    C_RESET='' C_BOLD='' C_INFO='' C_WARN='' C_ERROR=''
+fi
+
+log_info() { printf '%s==>%s %s\n' "$C_INFO" "$C_RESET" "$*"; }
+log_warn() { printf '%s==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
+
+confirm() {
+    local reply
+    read -rp "$1 [n/Y] " reply || return 1
+    case "${reply,,}" in
+        n | no) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+pkg_installed() { pacman -Qq "$1" &>/dev/null; }
+
+# The group database, not this session's credentials.
+group_in_db() {
+    local members
+    members="$(getent group input 2>/dev/null | cut -d: -f4)" || return 1
+    printf '%s' "$members" | tr ',' '\n' | grep -qx "$USER_NAME"
+}
+
+# What this session actually has. Only set at login, so it can lag the database.
+group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
+
+mode_desc() {
+    if group_in_session; then
+        echo "live (in input group)"
+    elif group_in_db; then
+        echo "deferred until logout (in input group, session predates it)"
+    else
+        echo "deferred (not in input group)"
+    fi
+}
+
+mode_effect() {
+    if group_in_session; then
+        echo "text appears as you speak"
+    else
+        echo "the whole utterance appears when you release the key"
+    fi
+}
+
+is_installed() {
+    command -v nerd-dictation &>/dev/null && [[ -L $MODEL_LINK ]]
+}
+
+model_index_for_dir() {
+    local dir="$1" i
+    for i in "${!MODEL_DIRS[@]}"; do
+        if [[ ${MODEL_DIRS[i]} == "$dir" ]]; then
+            printf '%s' "$i"
+            return 0
+        fi
+    done
+    return 1
+}
+
+current_model_dir() {
+    local target
+    target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
+    basename "$target"
+}
+
+print_plan() {
+    printf '%sptt install will:%s\n\n' "$C_BOLD" "$C_RESET"
+    printf '  1. install %s with yay\n' "${BASE_PKGS[*]}"
+    printf '  2. ask which vosk model you want, and install it\n'
+    printf '  3. link %s to the model\n' "${MODEL_LINK/#$HOME/\~}"
+    printf '  4. link %s to %s\n' "${BIN_LINK/#$HOME/\~}" "${PTT_DIR/#$HOME/\~}/ptt"
+    if ! group_in_db; then
+        printf '  5. offer to add you to the input group\n'
+    fi
+    printf '\npacman and yay will ask for your password themselves.\n\n'
+}
+
+choose_model() {
+    local i reply
+    printf '\n%sChoose a model:%s\n\n' "$C_BOLD" "$C_RESET" >&2
+    for i in "${!MODEL_PKGS[@]}"; do
+        printf '  %d) %-26s %-5s %-9s%s\n' \
+            "$((i + 1))" "${MODEL_PKGS[i]}" "${MODEL_VERS[i]}" "${MODEL_SIZES[i]}" \
+            "$([[ $i -eq 0 ]] && echo ' (default)')" >&2
+    done
+    printf '\n' >&2
+    while true; do
+        read -rp "Model [1-${#MODEL_PKGS[@]}, default 1]: " reply || reply=''
+        [[ -z $reply ]] && reply=1
+        if [[ $reply =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= ${#MODEL_PKGS[@]})); then
+            printf '%s' "$((reply - 1))"
+            return 0
+        fi
+        log_error "pick a number between 1 and ${#MODEL_PKGS[@]}"
+    done
+}
+
+install_model() {
+    local i="$1"
+    yay -S --needed "${MODEL_PKGS[i]}"
+    mkdir -p "$ND_CONFIG"
+    ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
+    log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]})"
+}
+
+offer_group() {
+    printf '\n'
+    printf 'Join the input group for live text as you speak, or decline and get deferred mode, where the whole utterance appears on key release.\n'
+    confirm "Join the input group?" || return 1
+    sudo gpasswd -a "$USER_NAME" input
+    return 0
+}
+
+print_bind_help() {
+    if [[ ! -d $HYPR_DIR ]]; then
+        log_info "ptt is installed and works from a terminal. Binding it to a key is up to the compositor you use."
+        return
+    fi
+    grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
+    cat <<'EOF'
+
+No keybind found. Add to ~/.config/hypr/modules/machine.lua:
+
+  hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
+  hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })
+
+Then: hyprctl reload
+EOF
+}
+
+summary() {
+    local group_added="${1:-0}"
+    printf '\n'
+    print_bind_help
+    if ((group_added)); then
+        log_warn "Log out and back in fully for the input group to apply. Until then ptt runs in deferred mode."
+    fi
+    log_info "Mode: $(mode_desc), $(mode_effect)."
+}
+
+first_run() {
+    print_plan
+    confirm "Proceed?" || {
+        log_info "Nothing done."
+        return 0
+    }
+
+    yay -S --needed "${BASE_PKGS[@]}"
+
+    local idx
+    idx="$(choose_model)"
+    install_model "$idx"
+
+    mkdir -p "$(dirname "$BIN_LINK")"
+    ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
+    log_info "linked ${BIN_LINK/#$HOME/\~} -> ${PTT_DIR/#$HOME/\~}/ptt"
+
+    local group_added=0
+    if ! group_in_db; then
+        if offer_group; then group_added=1; fi
+    fi
+
+    summary "$group_added"
+}
+
+action_change_model() {
+    local idx
+    idx="$(choose_model)"
+    install_model "$idx"
+    summary 0
+}
+
+action_join_group() {
+    local group_added=0
+    if offer_group; then group_added=1; fi
+    summary "$group_added"
+}
+
+menu_installed() {
+    local dir ver idx reply
+    dir="$(current_model_dir)" || dir='unknown'
+    if idx="$(model_index_for_dir "$dir")"; then
+        ver="${MODEL_VERS[idx]}"
+    else
+        ver='unknown'
+    fi
+
+    local -a labels=() actions=()
+    labels+=("change model") actions+=(action_change_model)
+    if ! group_in_db; then
+        labels+=("join the input group for live text") actions+=(action_join_group)
+    fi
+    labels+=("quit") actions+=(:)
+
+    printf 'ptt is installed.\n'
+    printf '  current model: %s (%s)\n' "$dir" "$ver"
+    printf '  mode:          %s\n\n' "$(mode_desc)"
+    local i
+    for i in "${!labels[@]}"; do
+        printf '  %d) %s\n' "$((i + 1))" "${labels[i]}"
+    done
+    printf '\n'
+
+    while true; do
+        read -rp "Choice [1-${#labels[@]}]: " reply || reply="${#labels[@]}"
+        if [[ $reply =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= ${#labels[@]})); then
+            "${actions[reply - 1]}"
+            return 0
+        fi
+        log_error "pick a number between 1 and ${#labels[@]}"
+    done
+}
+
+installed_model_pkgs() {
+    local pkg
+    for pkg in "${MODEL_PKGS[@]}"; do
+        if pkg_installed "$pkg"; then printf '%s\n' "$pkg"; fi
+    done
+}
+
+cmd_install() {
+    if is_installed; then
+        menu_installed
+    else
+        first_run
+    fi
+}
+
+cmd_uninstall() {
+    local -a rm_pkgs=()
+    if pkg_installed nerd-dictation-git; then rm_pkgs+=(nerd-dictation-git); fi
+    mapfile -t -O "${#rm_pkgs[@]}" rm_pkgs < <(installed_model_pkgs)
+
+    printf '%sptt uninstall will:%s\n\n' "$C_BOLD" "$C_RESET"
+    if ((${#rm_pkgs[@]})); then
+        printf '  - remove %s\n' "${rm_pkgs[*]}"
+    fi
+    printf '  - remove %s\n' "${ND_CONFIG/#$HOME/\~}"
+    printf '  - remove %s\n' "${BIN_LINK/#$HOME/\~}"
+    if group_in_db; then
+        printf '  - drop you from the input group\n'
+    fi
+    printf '\n%s is left in place.\n\n' "${PTT_DIR/#$HOME/\~}"
+
+    confirm "Proceed?" || {
+        log_info "Nothing done."
+        return 0
+    }
+
+    if ((${#rm_pkgs[@]})); then
+        yay -Rns "${rm_pkgs[@]}"
+    fi
+    rm -rf "$ND_CONFIG"
+    rm -f "$BIN_LINK"
+    if group_in_db; then
+        sudo gpasswd -d "$USER_NAME" input
+        log_warn "Log out and back in fully before the input group is actually gone for this session."
+    fi
+    log_info "Done."
+}
+
+main() {
+    case "${1:-install}" in
+        install) cmd_install ;;
+        uninstall) cmd_uninstall ;;
+        *)
+            log_error "unknown command: $1"
+            printf 'usage: ptt-install [install|uninstall]\n' >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Sourced by the test script, which calls the functions directly.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi
