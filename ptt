@@ -3,21 +3,19 @@
 # install and uninstall hand off to ptt-install.
 set -Eeuo pipefail
 
-# Resolved through the symlink, so ~/.local/bin/ptt finds ptt-install.
 DIR="$(dirname "$(readlink -f "$0")")"
 
 # Swapping the speech engine should mean rewriting this block and nothing else.
 BIN=nerd-dictation
 ARGS=(
     --simulate-input-tool=WTYPE
-    # Nothing is typed during the hold. Without it wtype types into the
-    # compositor, Hyprland loses the key release, and dictation never stops.
+    # Without this wtype types during the hold, Hyprland loses the key
+    # release, and dictation never stops.
     --defer-output
     --idle-time=0.2
     --punctuate-from-previous-timeout=2
     --full-sentence
-    # Hang backstop: the engine exits on its own after 30s with no speech
-    # processed, so a session that loses its release dies by itself.
+    # Hang backstop: exits on its own after 30s with no speech processed.
     --timeout 30
 )
 PKGS=(wtype nerd-dictation-git)
@@ -25,16 +23,27 @@ PKGS=(wtype nerd-dictation-git)
 KEY=F12
 KEYCODE=88
 
-# The packaged binary is a python script run through /usr/bin/env, so a live
-# session shows as "python3 /usr/bin/nerd-dictation begin ...". Ending shows as
-# "... end", which this must not match.
+# A live session shows as "python3 /usr/bin/nerd-dictation begin ...".
+# Ending shows as "... end", which this must not match.
 PATTERN="$BIN begin"
 
-# -E propagates this into functions. Off a key press there is no terminal to
-# print to, so failures go to the screen.
-trap 'notify-send -u critical -t 10000 "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
+if [[ -t 1 ]]; then
+    C_RESET=$'\e[0m'
+    C_PTT=$'\e[1;36m'
+    C_WARN=$'\e[1;33m'
+    C_ERROR=$'\e[1;31m'
+else
+    C_RESET='' C_PTT='' C_WARN='' C_ERROR=''
+fi
 
-# A missing engine off a key press is otherwise invisible.
+log_info() { printf '%s[ptt] INFO ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
+log_warn() { printf '%s[ptt] WARN ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s[ptt] ERR  ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
+
+# Off a key press there is no terminal, so failures also go to the screen.
+trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
+      notify-send -u critical -t 10000 "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
+
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
         notify-send -t 10000 "Voice typing not installed" \
@@ -45,17 +54,16 @@ require_engine() {
 
 cmd_begin() {
     require_engine
-    # A second press while a session runs would fight the first for the mic.
     pgrep -f "$PATTERN" &>/dev/null && exit 0
-    exec "$BIN" begin "${ARGS[@]}"
+    "$BIN" begin "${ARGS[@]}"
 }
 
 cmd_end() {
     require_engine
-    # Without this, a release with nothing running throws a Python traceback
-    # off a stale cookie.
+    # Without this guard a release with nothing running throws a Python
+    # traceback off a stale cookie.
     pgrep -f "$PATTERN" &>/dev/null || exit 0
-    exec "$BIN" end
+    "$BIN" end
 }
 
 case "${1:-}" in
@@ -64,6 +72,7 @@ case "${1:-}" in
     install) exec "$DIR/ptt-install" install ;;
     uninstall) exec "$DIR/ptt-install" uninstall ;;
     *)
+        log_error "unknown command: ${1:-}"
         printf 'usage: ptt [begin|end|install|uninstall]\n' >&2
         exit 1
         ;;
