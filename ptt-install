@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ptt-install - install, re-configure, or remove the ptt voice typing stack.
-set -euo pipefail
+set -Eeuo pipefail
 
 PTT_DIR="$HOME/.local/share/ptt"
 BIN_LINK="$HOME/.local/bin/ptt"
@@ -36,6 +36,9 @@ log_info() { printf '%s[ptt] ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
 log_warn() { printf '%s[ptt] ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
 log_error() { printf '%s[ptt] ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
 
+# -E propagates this into functions, so nothing fails silently.
+trap 'log_error "failed on line $LINENO: $BASH_COMMAND"; log_error "exiting, the machine is left as it is"' ERR
+
 rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
 
 heading() {
@@ -45,20 +48,32 @@ heading() {
     rule
 }
 
-# Every confirm shows the exact commands it is about to run.
-confirm_commands() {
-    local prompt="$1" reply line
-    shift
-    printf '\n%s[ptt] ==>%s these commands will run:\n\n' "$C_PTT" "$C_RESET"
-    while IFS= read -r line; do
-        [[ -n $line ]] && printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_BOLD" "$line" "$C_RESET"
-    done <<<"$*"
+confirm() {
+    local reply
     printf '\n'
-    read -rp "$prompt [n/Y] " reply || return 1
+    read -rp "$1 [n/Y] " reply || return 1
     case "${reply,,}" in
         n | no) return 1 ;;
         *) return 0 ;;
     esac
+}
+
+# Shows the exact command, then runs it only if confirmed.
+run_cmd() {
+    printf '\n    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_BOLD" "$*" "$C_RESET"
+    if ! confirm "Run it?"; then
+        log_warn "skipped: $*"
+        return 1
+    fi
+    "$@"
+}
+
+# Same, but a declined command means the rest of the run is pointless.
+step() {
+    run_cmd "$@" || {
+        log_warn "Stopped. Nothing further was done."
+        exit 1
+    }
 }
 
 # Menu picker. Writes the prompt to stderr, sets PICK to a 0-based index.
@@ -127,15 +142,19 @@ current_model_dir() {
     basename "$target"
 }
 
-plan_commands() {
-    printf 'sudo pacman -S --needed %s\n' "${REPO_PKGS[*]}"
-    printf 'yay -S --needed %s\n' "${AUR_PKGS[*]}"
-    printf 'yay -S --needed <the model you pick next>\n'
-    printf 'ln -sfn %s/<model> %s\n' "$MODEL_ROOT" "${MODEL_LINK/#$HOME/\~}"
-    printf 'ln -sfn %s/ptt %s\n' "${PTT_DIR/#$HOME/\~}" "${BIN_LINK/#$HOME/\~}"
+print_plan() {
+    local n=0
+    printf '\nptt install will:\n\n'
+    printf '  %d. install %s from the official repos\n' "$((++n))" "${REPO_PKGS[*]}"
+    printf '  %d. install %s from the AUR\n' "$((++n))" "${AUR_PKGS[*]}"
+    printf '  %d. ask which vosk model you want, and install it\n' "$((++n))"
+    printf '  %d. point %s at that model\n' "$((++n))" "${MODEL_LINK/#$HOME/\~}"
+    printf '  %d. put ptt on your PATH at %s\n' "$((++n))" "${BIN_LINK/#$HOME/\~}"
     if ! group_in_db; then
-        printf 'sudo gpasswd -a %s input   (offered separately)\n' "$USER_NAME"
+        printf '  %d. offer to add you to the input group for live text\n' "$((++n))"
     fi
+    printf '\nEvery command is shown for confirmation before it runs.\n'
+    printf 'pacman and yay ask for your password themselves.\n'
 }
 
 choose_model() {
@@ -143,10 +162,10 @@ choose_model() {
     heading "Choose a model" >&2
     printf '\n' >&2
     for i in "${!MODEL_PKGS[@]}"; do
-        printf '  %d) %-24s %-5s %-9s %-34s%s\n' \
+        printf '  %d) %-24s %-5s %s%s\n' \
             "$((i + 1))" "${MODEL_PKGS[i]}" "${MODEL_VERS[i]}" "${MODEL_SIZES[i]}" \
-            "$MODEL_ROOT/${MODEL_DIRS[i]}" \
-            "$([[ $i -eq $DEFAULT_MODEL ]] && echo ' (default)')" >&2
+            "$([[ $i -eq $DEFAULT_MODEL ]] && echo '  (default)')" >&2
+        printf '     %s%s%s\n\n' "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET" >&2
     done
     printf '\n' >&2
     prompt_index "${#MODEL_PKGS[@]}" "Model" "$DEFAULT_MODEL" >&2
@@ -154,24 +173,24 @@ choose_model() {
 
 install_model() {
     local i="$1"
-    log_info "running: yay -S --needed ${MODEL_PKGS[i]}"
-    yay -S --needed "${MODEL_PKGS[i]}"
+    step yay -S --needed "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
-    ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
+    step ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at ${MODEL_LINK/#$HOME/\~}"
 }
 
 offer_group() {
     heading "Live text needs the input group"
-    printf '\nJoin the input group for live text as you speak, or decline and get deferred mode, where the whole utterance appears on key release.\n'
-    confirm_commands "Join the input group?" "sudo gpasswd -a $USER_NAME input" || return 1
-    sudo gpasswd -a "$USER_NAME" input
-    return 0
+    printf '\nJoin for live text that appears as you speak.\n'
+    printf 'Decline for deferred mode, where the whole utterance\n'
+    printf 'appears when you release the key.\n'
+    run_cmd sudo gpasswd -a "$USER_NAME" input
 }
 
 print_bind_help() {
     if [[ ! -d $HYPR_DIR ]]; then
-        log_info "ptt is installed and works from a terminal. Binding it to a key is up to the compositor you use."
+        log_info "ptt is installed and works from a terminal."
+        log_info "Binding it to a key is up to the compositor you use."
         return
     fi
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
@@ -189,31 +208,32 @@ EOF
 print_mode() {
     local group_added="${1:-0}"
     if ((group_added)); then
-        log_warn "Log out and back in fully for the input group to apply. Until then ptt runs in deferred mode."
+        log_warn "Log out and back in fully for the input group to apply."
+        log_warn "Until then ptt runs in deferred mode."
     elif group_in_db && ! group_in_session; then
-        log_warn "You are already in the input group but this session predates it. Log out and back in for live text."
+        log_warn "You are in the input group, but this session predates it."
+        log_warn "Log out and back in for live text."
     fi
-    log_info "Mode: $(mode_desc), $(mode_effect)."
+    log_info "Mode: $(mode_desc)"
+    log_info "      $(mode_effect)."
 }
 
 first_run() {
     heading "ptt install"
-    if ! confirm_commands "Proceed?" "$(plan_commands)"; then
+    print_plan
+    if ! confirm "Proceed?"; then
         log_info "Nothing done."
         return 0
     fi
 
-    log_info "running: sudo pacman -S --needed ${REPO_PKGS[*]}"
-    sudo pacman -S --needed "${REPO_PKGS[@]}"
-    log_info "running: yay -S --needed ${AUR_PKGS[*]}"
-    yay -S --needed "${AUR_PKGS[@]}"
+    step sudo pacman -S --needed "${REPO_PKGS[@]}"
+    step yay -S --needed "${AUR_PKGS[@]}"
 
     choose_model
     install_model "$PICK"
 
     mkdir -p "$(dirname "$BIN_LINK")"
-    ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
-    log_info "linked ${BIN_LINK/#$HOME/\~} -> ${PTT_DIR/#$HOME/\~}/ptt"
+    step ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
 
     local group_added=0
     if ! group_in_db; then
@@ -289,31 +309,32 @@ cmd_uninstall() {
     if pkg_installed nerd-dictation-git; then rm_pkgs+=(nerd-dictation-git); fi
     mapfile -t -O "${#rm_pkgs[@]}" rm_pkgs < <(installed_model_pkgs)
 
-    local cmds=''
-    if ((${#rm_pkgs[@]})); then
-        cmds+="yay -Rns ${rm_pkgs[*]}"$'\n'
-    fi
-    cmds+="rm -rf ${ND_CONFIG/#$HOME/\~}"$'\n'
-    cmds+="rm -f ${BIN_LINK/#$HOME/\~}"$'\n'
-    if group_in_db; then
-        cmds+="sudo gpasswd -d $USER_NAME input"$'\n'
-    fi
-
+    local n=0
     heading "ptt uninstall"
+    printf '\nptt uninstall will:\n\n'
+    if ((${#rm_pkgs[@]})); then
+        printf '  %d. remove %s\n' "$((++n))" "${rm_pkgs[*]}"
+    fi
+    printf '  %d. remove %s\n' "$((++n))" "${ND_CONFIG/#$HOME/\~}"
+    printf '  %d. remove %s\n' "$((++n))" "${BIN_LINK/#$HOME/\~}"
+    if group_in_db; then
+        printf '  %d. drop you from the input group\n' "$((++n))"
+    fi
     printf '\n%s is left in place.\n' "${PTT_DIR/#$HOME/\~}"
-    if ! confirm_commands "Proceed?" "$cmds"; then
+    printf 'Every command is shown for confirmation before it runs.\n'
+    if ! confirm "Proceed?"; then
         log_info "Nothing done."
         return 0
     fi
 
     if ((${#rm_pkgs[@]})); then
-        yay -Rns "${rm_pkgs[@]}"
+        run_cmd yay -Rns "${rm_pkgs[@]}" || true
     fi
-    rm -rf "$ND_CONFIG"
-    rm -f "$BIN_LINK"
-    if group_in_db; then
-        sudo gpasswd -d "$USER_NAME" input
-        log_warn "Log out and back in fully before the input group is actually gone for this session."
+    run_cmd rm -rf "$ND_CONFIG" || true
+    run_cmd rm -f "$BIN_LINK" || true
+    if group_in_db && run_cmd sudo gpasswd -d "$USER_NAME" input; then
+        log_warn "The input group is gone from the database."
+        log_warn "Log out and back in fully before it is gone for this session."
     fi
     log_info "Done."
 }
