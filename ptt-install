@@ -61,7 +61,7 @@ confirm() {
 # Shows the exact command, then runs it only if confirmed.
 run_cmd() {
     printf '\n    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_BOLD" "$*" "$C_RESET"
-    if ! confirm "Run it?"; then
+    if ! confirm "Execute?"; then
         log_warn "skipped: $*"
         return 1
     fi
