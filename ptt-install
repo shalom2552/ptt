@@ -34,10 +34,11 @@ else
     C_RESET='' C_BOLD='' C_DIM='' C_PTT='' C_NUM='' C_CMD='' C_ARG='' C_WARN='' C_ERROR=''
 fi
 
-# Prefixed with [ptt] so our output never reads as pacman's.
-log_info() { printf '%s[ptt] ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
-log_warn() { printf '%s[ptt] ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
-log_error() { printf '%s[ptt] ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
+# Prefixed with [ptt] so our output never reads as pacman's. The level word
+# carries the distinction when colors are off, as in a pipe or a log.
+log_info() { printf '%s[ptt] INFO ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
+log_warn() { printf '%s[ptt] WARN ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s[ptt] ERR  ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
 
 # -E propagates this into functions, so nothing fails silently.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"; log_error "exiting, the machine is left as it is"' ERR
@@ -47,7 +48,7 @@ rule() { printf '%s%s%s\n' "$C_DIM" "──────────────�
 heading() {
     printf '\n'
     rule
-    printf '%s[ptt] ==>%s %s%s%s\n' "$C_PTT" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
+    printf '%s[ptt]%s %s%s%s\n' "$C_PTT" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
     rule
 }
 
@@ -61,9 +62,12 @@ confirm() {
     esac
 }
 
-# Shows the exact command, then runs it only if confirmed.
+# Shows the exact command and what it is for, then runs it only if confirmed.
 run_cmd() {
+    local note="$1"
+    shift
     printf '\n    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
+    printf '    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
     if ! confirm "Execute?"; then
         log_warn "skipped: $*"
         return 1
@@ -185,9 +189,11 @@ choose_model() {
 
 install_model() {
     local i="$1"
-    step yay -S --needed "${MODEL_PKGS[i]}"
+    step "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
+        yay -S --needed "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
-    step ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
+    step "point nerd-dictation at that model" \
+        ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at ${MODEL_LINK/#$HOME/\~}"
 }
 
@@ -196,7 +202,8 @@ offer_group() {
     printf '\nJoin for live text that appears as you speak.\n'
     printf 'Decline for deferred mode, where the whole utterance\n'
     printf 'appears when you release the key.\n'
-    run_cmd sudo gpasswd -a "$USER_NAME" input
+    run_cmd "add you to the input group, needs a logout to apply" \
+        sudo gpasswd -a "$USER_NAME" input
 }
 
 print_bind_help() {
@@ -219,6 +226,7 @@ EOF
 
 print_mode() {
     local group_added="${1:-0}"
+    printf '\n'
     if ((group_added)); then
         log_warn "Log out and back in fully for the input group to apply."
         log_warn "Until then ptt runs in deferred mode."
@@ -238,14 +246,17 @@ first_run() {
         return 0
     fi
 
-    step sudo pacman -S --needed "${REPO_PKGS[@]}"
-    step yay -S --needed "${AUR_PKGS[@]}"
+    step "install ${REPO_PKGS[*]} from pacman, types the text" \
+        sudo pacman -S --needed "${REPO_PKGS[@]}"
+    step "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
+        yay -S --needed "${AUR_PKGS[@]}"
 
     choose_model
     install_model "$PICK"
 
     mkdir -p "$(dirname "$BIN_LINK")"
-    step ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
+    step "put ptt on your PATH for terminal use" \
+        ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
 
     local group_added=0
     if ! group_in_db; then
@@ -297,7 +308,7 @@ menu_installed() {
         printf '  %d) %s\n' "$((i + 1))" "${labels[i]}"
     done
     printf '\n'
-    prompt_index "${#labels[@]}" "Choice"
+    prompt_index "${#labels[@]}" "Choice" "$((${#labels[@]} - 1))"
     "${actions[PICK]}"
 }
 
@@ -355,11 +366,17 @@ cmd_uninstall() {
     fi
 
     if ((${#rm_pkgs[@]})); then
-        run_cmd yay -Rns "${rm_pkgs[@]}" || true
+        run_cmd "remove the engine and models, with their orphaned deps" \
+            yay -Rns "${rm_pkgs[@]}" || true
     fi
-    if ((do_cfg)); then run_cmd rm -rf "$ND_CONFIG" || true; fi
-    if ((do_link)); then run_cmd rm -f "$BIN_LINK" || true; fi
-    if ((do_group)) && run_cmd sudo gpasswd -d "$USER_NAME" input; then
+    if ((do_cfg)); then
+        run_cmd "remove the model symlink" rm -rf "$ND_CONFIG" || true
+    fi
+    if ((do_link)); then
+        run_cmd "take ptt off your PATH" rm -f "$BIN_LINK" || true
+    fi
+    if ((do_group)) && run_cmd "drop you from the input group" \
+        sudo gpasswd -d "$USER_NAME" input; then
         log_warn "The input group is gone from the database."
         log_warn "Log out and back in fully before it is gone for this session."
     fi
