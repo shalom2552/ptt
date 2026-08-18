@@ -83,15 +83,20 @@ lines inherit everything `ptt-install` already does.
 
 **Blocked by:** 01 — the engine and model have to be installed first.
 
-**Status:** ready-for-agent
+**Status:** built, needs a microphone pass
 
-- [ ] `~/.local/share/ptt/ptt` exists, is executable, and dispatches begin, end, install, uninstall
-- [ ] Variable block at the top holds `BIN`, `ARGS`, `PKGS`, `KEY`/`KEYCODE`, with a comment tying `KEYCODE` to the bind
-- [ ] `pgrep -f` pattern derived from the packaged binary's real cmdline, matches when running and not when stopped
+`--delay-exit=0.2` was dropped. Upstream only applies it when `--timeout` is
+zero, so the two flags this ticket asks for together cannot both take effect.
+See `docs/findings.md`, which also records a doubt about `--timeout 30` being
+the backstop this ticket assumes.
+
+- [x] `~/.local/share/ptt/ptt` exists, is executable, and dispatches begin, end, install, uninstall
+- [x] Variable block at the top holds `BIN`, `ARGS`, `PKGS`, `KEY`/`KEYCODE`, with a comment tying `KEYCODE` to the bind
+- [x] `pgrep -f` pattern derived from the packaged binary's real cmdline, matches when running and not when stopped
 - [ ] Hold F12, speak, release: text appears in one go on release
 - [ ] Pressing F12 twice in a row does not start a second session
-- [ ] Releasing F12 with nothing running exits quietly, no traceback
+- [x] Releasing F12 with nothing running exits quietly, no traceback
 - [ ] With `nerd-dictation` off PATH, both begin and end fire the not-installed notification
-- [ ] Checked whether `--delay-exit=0.2` clips the last word on the linked model; recorded the finding either way
-- [ ] `set -Eeuo pipefail` and an `ERR` trap, per `docs/conventions.md`
-- [ ] Both binds present in `machine.lua` by full path, `hyprctl reload` applied, nothing staged or committed in the hypr repo
+- [x] Checked whether `--delay-exit=0.2` clips the last word on the linked model; recorded the finding either way
+- [x] `set -Eeuo pipefail` and an `ERR` trap, per `docs/conventions.md`
+- [x] Both binds present in `machine.lua` by full path, `hyprctl reload` applied, nothing staged or committed in the hypr repo
