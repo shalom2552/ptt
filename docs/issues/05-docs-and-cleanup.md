@@ -19,6 +19,18 @@ transfer.
 Record that uninstall drops the group membership, so the doc matches what the
 tool actually does.
 
+Three things settled during ticket 01 that the doc has to state, because they
+contradict what was written before:
+
+- `wtype` comes from pacman, not yay. Only the AUR packages go through yay.
+- The installer defaults to `vosk-model-small-en-us` 0.15 at ~40 MB, and lists
+  models smallest first. The 1.8 GB `en-us` is still offered.
+- Uninstall removes every installed `vosk-model-*` package it knows about, not
+  just the linked one, and never touches `wtype`.
+
+`docs/conventions.md` holds the output and confirmation conventions. The doc
+does not need to repeat them, but it must not describe anything that conflicts.
+
 The document points at the tool. The tool does not point back: `ptt` references
 no external document.
 
@@ -33,5 +45,6 @@ the old tree goes and the doc is called accurate.
 - [ ] `nerd-dictation-wayland-input.md` describes the package install, both modes, the new paths, and the group tradeoff
 - [ ] The `input` group risk is stated plainly, with the docker note marked as machine specific
 - [ ] Doc says uninstall removes the group membership
+- [ ] Doc states the pacman/yay split, the small model default, and that uninstall leaves `wtype` alone
 - [ ] Nothing in `ptt`, `ptt-install`, or `ptt-keywatch` points back at the document
 - [ ] Confirmed with the user, then `~/.local/share/voice-tools` removed

@@ -20,6 +20,9 @@ re-run it.
 `~/.config/hypr` is a real repo with an unrelated dirty file. Do not stage it and
 do not commit.
 
+Nothing here prints to a user, so only the shell script conventions in
+`docs/conventions.md` apply.
+
 **Blocked by:** 02 — the variable block and the binds have to exist before the
 key can be swapped.
 

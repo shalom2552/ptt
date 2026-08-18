@@ -119,6 +119,26 @@ Create a throwaway local user that is not in the group, run the installer as tha
 user, and confirm both the offer and the accept path. Remove the throwaway user
 afterwards. Ask before creating or deleting the account.
 
+## Changed while building
+
+Decided against what is written above. `docs/conventions.md` has the detail.
+
+- `wtype` installs with `sudo pacman -S --needed`, not yay. Only the AUR
+  packages go through yay, because the official repos are signed and the AUR is
+  a maintainer's build script.
+- The model menu lists smallest first and defaults to `vosk-model-small-en-us`
+  0.15, not `en-us` 0.22. Pressing enter should not start a 1.8 GB download.
+- Two confirmation stages, not one. A prose plan gets one `Proceed?`, then every
+  command is shown with a one line comment and confirmed with `Execute?` right
+  before it runs. The single prompt hid what `yay -S --needed <model>` would
+  actually be.
+- Log lines carry a level, `[ptt] INFO ==>`, so the output survives a pipe and
+  never reads as pacman's.
+- Uninstall removes every installed `vosk-model-*` package, not only the linked
+  one, and lists only the things that are actually present.
+- No throwaway user was needed for the group test. Uninstall drops the
+  membership, so the join path can be exercised on the real account.
+
 **Blocked by:** None — can start immediately.
 
 **Status:** ready-for-agent

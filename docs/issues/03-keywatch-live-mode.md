@@ -43,6 +43,10 @@ Deferred mode has to be re-verified here, and this machine is already in the
 `input` group, so it will pick live. Force `can_watch` to fail on purpose and
 confirm deferred still works. Both modes must work before this is called done.
 
+`ptt-keywatch` is a background process with no terminal, so it prints nothing
+and the output conventions in `docs/conventions.md` do not apply. The shell
+script conventions do, for whatever shell code this slice adds to `ptt`.
+
 **Blocked by:** 02 — extends the same `ptt` script and the binds it installed.
 
 **Status:** ready-for-agent

@@ -48,8 +48,10 @@ nerd-dictation begin \
 
 `--timeout 30` is the hang backstop: the engine exits on its own after 30s with
 no speech processed, so a session that loses its watcher dies by itself.
-`--delay-exit=0.2` was tuned against the 40 MB model, so check whether it clips
-the last word on the 0.22 model and only raise it if it actually does.
+`--delay-exit=0.2` was tuned against the 40 MB model, which ticket 01 ended up
+making the installer default, so the value is already matched to the common
+case. Check it against whichever model is actually linked and only raise it if
+it clips the last word.
 
 This slice runs deferred only, so `begin` also passes `--defer-output` and spawns
 nothing. Without it, wtype types during the hold, Hyprland loses the key release,
@@ -73,6 +75,12 @@ stage it and do not commit. Hyprland uses the native Lua config, so
 Short comments in `ptt` for the load bearing parts. `ptt` references no external
 document.
 
+`ptt` prints nothing to a terminal in normal use, so the output and confirmation
+conventions in `docs/conventions.md` do not apply to `begin` and `end`. The
+shell script conventions do: `set -Eeuo pipefail`, and the notification path
+stays helper free, as ticket 01 decided. The `install` and `uninstall` dispatch
+lines inherit everything `ptt-install` already does.
+
 **Blocked by:** 01 — the engine and model have to be installed first.
 
 **Status:** ready-for-agent
@@ -84,5 +92,6 @@ document.
 - [ ] Pressing F12 twice in a row does not start a second session
 - [ ] Releasing F12 with nothing running exits quietly, no traceback
 - [ ] With `nerd-dictation` off PATH, both begin and end fire the not-installed notification
-- [ ] Checked whether `--delay-exit=0.2` clips the last word on the 0.22 model; recorded the finding either way
+- [ ] Checked whether `--delay-exit=0.2` clips the last word on the linked model; recorded the finding either way
+- [ ] `set -Eeuo pipefail` and an `ERR` trap, per `docs/conventions.md`
 - [ ] Both binds present in `machine.lua` by full path, `hyprctl reload` applied, nothing staged or committed in the hypr repo
