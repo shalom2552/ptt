@@ -31,17 +31,17 @@ else
     C_RESET='' C_BOLD='' C_DIM='' C_PTT='' C_WARN='' C_ERROR=''
 fi
 
-# Prefix is [ptt], not pacman's ==>, so our output never reads as package output.
-log_info() { printf '%s[ptt]%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
-log_warn() { printf '%s[ptt]%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
-log_error() { printf '%s[ptt]%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
+# Prefixed with [ptt] so our output never reads as pacman's.
+log_info() { printf '%s[ptt] ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
+log_warn() { printf '%s[ptt] ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s[ptt] ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
 
 rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
 
 heading() {
     printf '\n'
     rule
-    printf '%s[ptt]%s %s%s%s\n' "$C_PTT" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
+    printf '%s[ptt] ==>%s %s%s%s\n' "$C_PTT" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
     rule
 }
 
@@ -49,7 +49,7 @@ heading() {
 confirm_commands() {
     local prompt="$1" reply line
     shift
-    printf '\n%s[ptt]%s these commands will run:\n\n' "$C_PTT" "$C_RESET"
+    printf '\n%s[ptt] ==>%s these commands will run:\n\n' "$C_PTT" "$C_RESET"
     while IFS= read -r line; do
         [[ -n $line ]] && printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_BOLD" "$line" "$C_RESET"
     done <<<"$*"
