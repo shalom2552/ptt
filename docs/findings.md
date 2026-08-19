@@ -38,9 +38,13 @@ Ticket 01 records the package as pinned to `aceb2bf` (r156). What installs today
 is `nerd-dictation-git 0.0.r161.41f3727-1`. Both flags above were re-checked
 against the installed file, not against r156.
 
-## `pgrep -f` matches the caller
+## The cookie file is the whole session state
 
-`pgrep -f "nerd-dictation begin"` also matches any shell whose own command line
-contains that string, which makes it easy to misread a test as a live session.
-It does not affect `ptt`, whose command line is `bash .../ptt begin`, but it
-does affect testing by hand. Split the pattern when checking from a terminal.
+Three things `ptt` reads off a session's `--cookie`, none of them documented.
+Lines are `/usr/bin/nerd-dictation`.
+
+- mtime 0 means listening, anything else means over (1329).
+- Removing a live cookie cancels the session and drops its text (1347), so
+  cookies pile up in `$XDG_RUNTIME_DIR` until logout.
+- Its age at `begin` is the `--punctuate-from-previous-timeout` window (1317),
+  so `begin` carries the previous cookie's mtime forward.
