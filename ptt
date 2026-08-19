@@ -93,7 +93,7 @@ cmd_begin() {
         args+=("${DEFER_ARGS[@]}")
     fi
     notify_state 30000 listening
-    "$BIN" begin "${args[@]}"
+    setsid -f "$BIN" begin "${args[@]}" # detached, caller returns at once
 }
 
 cmd_end() {
