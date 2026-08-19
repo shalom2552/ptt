@@ -1,12 +1,15 @@
 # Conventions
 
-Settled while building ticket 01. Everything user facing in this project follows
-these. Where a ticket says otherwise, this file wins and the ticket is stale.
+How the tools behave. Beats any ticket that says otherwise.
+
+## Voice
+
+Man page style: imperative, impersonal, terse.
+Name the thing, not the person: "leave the input group", not "drop you from it".
 
 ## Output
 
-Every line the tool prints carries a level, so our output is never mistaken for
-pacman's and survives being piped where colors are gone:
+Every printed line carries a level, so output never reads as pacman's:
 
 ```
 [ptt] INFO ==> text
@@ -14,8 +17,7 @@ pacman's and survives being piped where colors are gone:
 [ptt] ERR  ==> text
 ```
 
-Section headings are the exception. They get the tag with no level, wrapped in
-dim rules:
+Headings are the exception: the tag, no level, dim rules around it.
 
 ```
 ────────────────────────────────────────────────────────
@@ -23,49 +25,48 @@ dim rules:
 ────────────────────────────────────────────────────────
 ```
 
-Colors: cyan tag, cyan step numbers, green for values inside prose (package
-names, paths), bold green for commands, dim for `$`, `#`, and asides. Yellow
-warnings, red errors. All of it drops to plain text when stdout is not a tty.
-
-Prefer two short lines over one long one. Wrap anything past roughly 70
-columns rather than letting it run.
-
-Print only what applies to the situation found. Silence when there is nothing
-to say. No entry for a thing that is not there, no removal offered for a file
-that does not exist.
+Colors: cyan tag and step numbers, green values, bold green commands, dim `$`,
+`#`, and asides, yellow warnings, red errors. Plain text off a tty.
+Two short lines beat one long one. Wrap past ~70 columns.
+Print only what applies. Nothing about a thing that is not there.
 
 ## Confirmation
 
-Two stages, always in this order:
+1. Numbered plain English plan, no commands, then one `Proceed? [n/Y]`.
+2. Each command announced on one line as it runs.
 
-1. A plain English plan of what the run will do, numbered, no commands and no
-   placeholders. Then one `Proceed? [n/Y]`.
-2. Immediately before each command runs, the exact command and a one line
-   comment saying what it is for. Then `Execute? [n/Y]`.
+Mechanics go quiet, choices always ask.
+A mechanic is a step the plan covered: a package install, a symlink.
+A choice costs what the run cannot undo, like the input group's logout.
+A choice shows its command and asks in both modes.
+
+`-s` / `--step` confirms the mechanics too, so nothing runs unseen:
 
 ```
-    $ sudo pacman -S --needed wtype
     # install wtype from pacman, types the text
+    $ sudo pacman -S --needed wtype
 
 Execute? [n/Y]
 ```
 
-Nothing runs that the user has not just seen in the form it will run. Declining
-a command during install stops the run; declining during uninstall skips that
-one command and continues, because the removals are independent.
-
+Declining stops an install. During uninstall it skips one command and
+continues, since the removals are independent.
 Prompts default to yes (`[n/Y]`). Menus name their default in the hint
-(`Choice [1-2, default 2]`), and a menu's default is the harmless option.
+(`Choice [1-2, default 2]`) and default to the harmless option.
+
+## Help
+
+`-h` / `--help` lists commands, flags, examples.
+Bare `ptt` prints the same help, exit 0. Unknown argument prints it to stderr,
+exit 1.
+Help text lives in `share/help/`, plain text, no absolute paths.
 
 ## Packages
 
-`pacman` for anything in the official repos, `yay` only for the AUR. The
-official repos are signed; the AUR runs a maintainer's build script. Do not
-route repo packages through yay just because yay is already there.
-
-Both ask for a password themselves. `yay -S` and `yay -Rns` shell out to
-`sudo pacman`, so a password prompt during those is expected and is not ours.
-
+`pacman` for the official repos, `yay` only for the AUR. Never repo packages
+through yay.
+Both ask for their own password, so a prompt under `yay -S` or `yay -Rns` is
+not ours.
 `--needed` on install, so a re-run changes nothing.
 
 ## Shell scripts
@@ -79,7 +80,6 @@ trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 ## Models
 
-The menu lists models smallest first and defaults to the smallest,
-`vosk-model-small-en-us` 0.15 at ~40 MB. Ticket 01 originally said best first
-with `en-us` 0.22 as the default; changed because the 1.8 GB download is a poor
-thing to hand someone by pressing enter.
+Menu lists models smallest first, defaults to the smallest,
+`vosk-model-small-en-us` 0.15 at ~40 MB. A 1.8 GB download is a poor thing to
+hand someone by pressing enter.

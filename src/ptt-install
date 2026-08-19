@@ -48,9 +48,9 @@ mode_desc() {
 
 mode_effect() {
     if group_in_session; then
-        echo "text appears as you speak"
+        echo "text appears while speaking"
     else
-        echo "the whole utterance appears when you release the key"
+        echo "the utterance appears on key release"
     fi
 }
 
@@ -80,15 +80,15 @@ print_plan() {
     plan_title "ptt install will:"
     plan_line "$((++n))" "install $(arg "${REPO_PKGS[*]}") from the official repos"
     plan_line "$((++n))" "install $(arg "${AUR_PKGS[*]}") from the AUR"
-    plan_line "$((++n))" "ask which vosk model you want, and install it"
+    plan_line "$((++n))" "install a vosk model, picked from a menu"
     plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
-    plan_line "$((++n))" "put ptt on your PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
+    plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
     if ! group_in_db; then
-        plan_line "$((++n))" "offer to add you to the $(arg input) group for live text"
+        plan_line "$((++n))" "offer to join the $(arg input) group for live text"
     fi
     printf '\n'
-    plan_note "Every command is shown for confirmation before it runs."
-    plan_note "pacman and yay ask for your password themselves."
+    plan_step_note
+    plan_note "pacman and yay prompt for sudo themselves."
 }
 
 choose_model() {
@@ -107,34 +107,33 @@ choose_model() {
 
 install_model() {
     local i="$1"
-    step "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
+    run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
         yay -S --needed "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
-    step "point nerd-dictation at that model" \
+    run_or_stop "point nerd-dictation at that model" \
         ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at ${MODEL_LINK/#$HOME/\~}"
 }
 
 offer_group() {
     heading "Live text needs the input group"
-    printf '\nJoin for live text that appears as you speak.\n'
-    printf 'Decline for deferred mode, where the whole utterance\n'
-    printf 'appears when you release the key.\n'
-    run_cmd "add you to the input group, needs a logout to apply" \
+    printf '\nJoin for live text that appears while speaking.\n'
+    printf 'Decline for deferred text on key release.\n'
+    ask_cmd "join the input group, applies after logout" \
         sudo gpasswd -a "$USER_NAME" input
 }
 
 print_bind_help() {
     if [[ ! -d $HYPR_DIR ]]; then
-        log_info "ptt is installed and works from a terminal."
-        log_info "Binding it to a key is up to the compositor you use."
+        log_info "ptt is installed and runs from a terminal."
+        log_info "Key binding is compositor specific."
         return
     fi
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
     local p="${PTT_ROOT/#$HOME/\~}/ptt"
     cat <<EOF
 
-No keybind found. Add to your Hyprland config:
+No keybind found. Add to the Hyprland config:
 
   hl.bind("F12", hl.dsp.exec_cmd("$p begin"))
   hl.bind("F12", hl.dsp.exec_cmd("$p end"), { release = true })
@@ -147,10 +146,10 @@ print_mode() {
     local group_added="${1:-0}"
     printf '\n'
     if ((group_added)); then
-        log_warn "Log out and back in fully for the input group to apply."
+        log_warn "Log out and back in for the input group to apply."
         log_warn "Until then ptt runs in deferred mode."
     elif group_in_db && ! group_in_session; then
-        log_warn "You are in the input group, but this session predates it."
+        log_warn "This session predates the input group membership."
         log_warn "Log out and back in for live text."
     fi
     log_info "Mode: $(mode_desc)"
@@ -165,16 +164,16 @@ first_run() {
         return 0
     fi
 
-    step "install ${REPO_PKGS[*]} from pacman, types the text" \
+    run_or_stop "install ${REPO_PKGS[*]} from pacman, types the text" \
         sudo pacman -S --needed "${REPO_PKGS[@]}"
-    step "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
+    run_or_stop "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
         yay -S --needed "${AUR_PKGS[@]}"
 
     choose_model
     install_model "$PICK"
 
     mkdir -p "$(dirname "$BIN_LINK")"
-    step "put ptt on your PATH for terminal use" \
+    run_or_stop "link ptt onto PATH for terminal use" \
         ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
 
     local group_added=0
@@ -274,11 +273,11 @@ cmd_uninstall() {
         plan_line "$((++n))" "remove $(arg "${BIN_LINK/#$HOME/\~}")"
     fi
     if ((do_group)); then
-        plan_line "$((++n))" "drop you from the $(arg input) group"
+        plan_line "$((++n))" "leave the $(arg input) group"
     fi
     printf '\n'
     plan_note "$(printf '%s is left in place.' "${PTT_ROOT/#$HOME/\~}")"
-    plan_note "Every command is shown for confirmation before it runs."
+    plan_step_note
     if ! confirm "Proceed?"; then
         log_info "Nothing done."
         return 0
@@ -292,25 +291,36 @@ cmd_uninstall() {
         run_cmd "remove the model symlink" rm -rf "$ND_CONFIG" || true
     fi
     if ((do_link)); then
-        run_cmd "take ptt off your PATH" rm -f "$BIN_LINK" || true
+        run_cmd "unlink ptt from PATH" rm -f "$BIN_LINK" || true
     fi
-    if ((do_group)) && run_cmd "drop you from the input group" \
+    if ((do_group)) && ask_cmd "leave the input group" \
         sudo gpasswd -d "$USER_NAME" input; then
-        log_warn "The input group is gone from the database."
-        log_warn "Log out and back in fully before it is gone for this session."
+        log_warn "The input group is dropped in the database."
+        log_warn "Log out and back in to clear it from this session."
     fi
     log_info "Done."
 }
 
 main() {
-    case "${1:-install}" in
+    local a cmd=''
+    for a in "$@"; do
+        case "$a" in
+            -h | --help)
+                usage ptt-install
+                return 0
+                ;;
+            -s | --step) PTT_STEP=1 ;;
+            install | uninstall)
+                if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
+                cmd="$a"
+                ;;
+            *) bad_arg ptt-install "$a" ;;
+        esac
+    done
+
+    case "${cmd:-install}" in
         install) cmd_install ;;
         uninstall) cmd_uninstall ;;
-        *)
-            log_error "unknown command: $1"
-            printf 'usage: ptt-install [install|uninstall]\n' >&2
-            exit 1
-            ;;
     esac
 }
 

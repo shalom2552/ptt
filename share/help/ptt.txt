@@ -1,0 +1,20 @@
+ptt - push to talk voice typing
+
+usage: ptt <command> [options]
+
+commands:
+  begin        start dictating
+  end          stop dictating and type the text
+  install      install the stack, or reconfigure it
+  uninstall    remove the packages, model, and symlinks
+
+options:
+  -s, --step   show each command and confirm it before it runs
+  -h, --help   show this help
+
+examples:
+  ptt install
+  ptt install --step
+  ptt uninstall
+
+begin and end are called by a keybind. install and uninstall are run by hand.
