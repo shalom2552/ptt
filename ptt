@@ -43,24 +43,29 @@ log_info() { printf '%s[ptt] INFO ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
 log_warn() { printf '%s[ptt] WARN ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
 log_error() { printf '%s[ptt] ERR  ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
 
+# One tray slot, so a notice replaces the last instead of stacking.
+notify() {
+    local urgency=$1 timeout=$2 title=$3 body=$4
+    notify-send -u "$urgency" -h string:x-canonical-private-synchronous:ptt \
+        -t "$timeout" "$title" "$body" || true
+}
+
+notify_warn() { notify "critical" 10000 "$1" "$2"; }
+
 # Off a key press there is no terminal, so failures also go to the screen.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
-      notify-send -u critical -t 10000 "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
+      notify_warn "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
 
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
-        notify-send -t 10000 "Voice typing not installed" \
-            "Run: ${DIR/#$HOME/\~}/ptt install"
+        notify_warn "Voice typing not installed" "Run: ${DIR/#$HOME/\~}/ptt install"
         exit 0
     fi
 }
 
 engine_running() { pgrep -f "$PATTERN" &>/dev/null; }
 
-# One tray slot, so end replaces listening instead of stacking.
-notify_state() {
-    notify-send -h string:x-canonical-private-synchronous:ptt -t "$1" ptt "$2"
-}
+notify_state() { notify "normal" "$1" ptt "$2"; }
 
 # True when the watcher has something to read. A session that predates its own
 # gpasswd is in the input group and still cannot open a device, so this tests
@@ -78,8 +83,7 @@ watch_release() {
     if "$DIR/ptt-keywatch" "$KEYCODE"; then
         cmd_end
     else
-        notify-send -u critical -t 10000 "ptt" \
-            "key watcher failed, dictation stops on timeout"
+        notify_warn ptt "key watcher failed, dictation stops on timeout"
     fi
 }
 
@@ -97,7 +101,7 @@ cmd_begin() {
 }
 
 cmd_end() {
-    require_engine
+    command -v "$BIN" &>/dev/null || exit 0
     # Live mode reaches here twice, from the watcher and from the release
     # bind. Two engine ends race, and the loser throws on the gone cookie.
     exec 9>"$LOCK"
