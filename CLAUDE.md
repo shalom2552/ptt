@@ -26,8 +26,8 @@ share/help/         help text
 share/completions/  shell completions
 ```
 
-Every script sets `PTT_ROOT` from its own location and builds its paths from
-there, so a clone works at any path. Nothing hardcodes a repo path.
+Each bash script sets `PTT_ROOT` from its own location and builds its paths
+from there, so a clone works at any path. No script hardcodes a repo path.
 
 ## Code
 
