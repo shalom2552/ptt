@@ -2,7 +2,10 @@
 # ptt-install - install, re-configure, or remove the ptt voice typing stack.
 set -Eeuo pipefail
 
-PTT_DIR="$(dirname "$(readlink -f "$0")")"
+PTT_ROOT="$(dirname "$(dirname "$(readlink -f "$0")")")"
+source "$PTT_ROOT/src/lib/log.sh"
+source "$PTT_ROOT/src/lib/ui.sh"
+
 BIN_LINK="$HOME/.local/bin/ptt"
 ND_CONFIG="$HOME/.config/nerd-dictation"
 MODEL_LINK="$ND_CONFIG/model"
@@ -20,85 +23,8 @@ MODEL_VERS=(0.15 0.22 0.22)
 MODEL_SIZES=("~40 MB" "~128 MB" "~1.8 GB")
 DEFAULT_MODEL=0
 
-if [[ -t 1 ]]; then
-    C_RESET=$'\e[0m'
-    C_BOLD=$'\e[1m'
-    C_DIM=$'\e[2m'
-    C_PTT=$'\e[1;36m'
-    C_NUM=$'\e[36m'
-    C_CMD=$'\e[1;32m'
-    C_ARG=$'\e[32m'
-    C_WARN=$'\e[1;33m'
-    C_ERROR=$'\e[1;31m'
-else
-    C_RESET='' C_BOLD='' C_DIM='' C_PTT='' C_NUM='' C_CMD='' C_ARG='' C_WARN='' C_ERROR=''
-fi
-
-# Prefixed with [ptt] so our output never reads as pacman's. The level word
-# carries the distinction when colors are off, as in a pipe or a log.
-log_info() { printf '%s[ptt] INFO ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
-log_warn() { printf '%s[ptt] WARN ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
-log_error() { printf '%s[ptt] ERR  ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
-
 # -E propagates this into functions, so nothing fails silently.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"; log_error "exiting, the machine is left as it is"' ERR
-
-rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
-
-heading() {
-    printf '\n'
-    rule
-    printf '%s[ptt]%s %s%s%s\n' "$C_PTT" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
-    rule
-}
-
-confirm() {
-    local reply
-    printf '\n'
-    read -rp "$1 [n/Y] " reply || return 1
-    case "${reply,,}" in
-        n | no) return 1 ;;
-        *) return 0 ;;
-    esac
-}
-
-# Shows the exact command and what it is for, then runs it only if confirmed.
-run_cmd() {
-    local note="$1"
-    shift
-    printf '\n    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
-    printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
-    if ! confirm "Execute?"; then
-        log_warn "skipped: $*"
-        return 1
-    fi
-    "$@"
-}
-
-# Same, but a declined command means the rest of the run is pointless.
-step() {
-    run_cmd "$@" || {
-        log_warn "Stopped. Nothing further was done."
-        exit 1
-    }
-}
-
-# Menu picker. Writes the prompt to stderr, sets PICK to a 0-based index.
-PICK=0
-prompt_index() {
-    local count="$1" label="$2" default="${3:-}" reply hint
-    hint="1-$count"
-    [[ -n $default ]] && hint="$hint, default $((default + 1))"
-    while true; do
-        read -rp "$label [$hint]: " reply || reply=''
-        [[ -z $reply && -n $default ]] && reply=$((default + 1))
-        if [[ $reply =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= count)); then
-            PICK=$((reply - 1))
-            return 0
-        fi
-        log_error "pick a number between 1 and $count"
-    done
-}
 
 pkg_installed() { pacman -Qq "$1" &>/dev/null; }
 
@@ -148,14 +74,6 @@ current_model_dir() {
     target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
     basename "$target"
 }
-
-arg() { printf '%s%s%s' "$C_ARG" "$1" "$C_RESET"; }
-
-plan_title() { printf '\n%s%s%s\n\n' "$C_BOLD" "$1" "$C_RESET"; }
-
-plan_line() { printf '  %s%d.%s %s\n' "$C_NUM" "$1" "$C_RESET" "$2"; }
-
-plan_note() { printf '%s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
 
 print_plan() {
     local n=0
@@ -213,7 +131,7 @@ print_bind_help() {
         return
     fi
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
-    local p="${PTT_DIR/#$HOME/\~}/ptt"
+    local p="${PTT_ROOT/#$HOME/\~}/ptt"
     cat <<EOF
 
 No keybind found. Add to your Hyprland config:
@@ -257,7 +175,7 @@ first_run() {
 
     mkdir -p "$(dirname "$BIN_LINK")"
     step "put ptt on your PATH for terminal use" \
-        ln -sfn "$PTT_DIR/ptt" "$BIN_LINK"
+        ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
 
     local group_added=0
     if ! group_in_db; then
@@ -359,7 +277,7 @@ cmd_uninstall() {
         plan_line "$((++n))" "drop you from the $(arg input) group"
     fi
     printf '\n'
-    plan_note "$(printf '%s is left in place.' "${PTT_DIR/#$HOME/\~}")"
+    plan_note "$(printf '%s is left in place.' "${PTT_ROOT/#$HOME/\~}")"
     plan_note "Every command is shown for confirmation before it runs."
     if ! confirm "Proceed?"; then
         log_info "Nothing done."
