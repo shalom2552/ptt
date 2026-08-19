@@ -331,6 +331,15 @@ cmd_install() {
     fi
 }
 
+# Picks a model and nothing else, so no stale link check.
+cmd_model() {
+    if ! is_installed; then
+        log_error "ptt is not installed, run: ptt install"
+        exit 1
+    fi
+    action_change_model
+}
+
 cmd_uninstall() {
     local -a rm_pkgs=()
     if pkg_installed nerd-dictation-git; then rm_pkgs+=(nerd-dictation-git); fi
@@ -399,7 +408,7 @@ cmd_uninstall() {
 }
 
 main() {
-    local a cmd=''
+    local a cmd='' model=0 model_arg=''
     for a in "$@"; do
         case "$a" in
             -h | --help)
@@ -407,6 +416,10 @@ main() {
                 return 0
                 ;;
             -s | --step) PTT_STEP=1 ;;
+            -m | --model)
+                model=1
+                model_arg="$a"
+                ;;
             install | uninstall)
                 if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
                 cmd="$a"
@@ -416,8 +429,13 @@ main() {
     done
 
     case "${cmd:-install}" in
-        install) cmd_install ;;
-        uninstall) cmd_uninstall ;;
+        install)
+            if ((model)); then cmd_model; else cmd_install; fi
+            ;;
+        uninstall)
+            if ((model)); then bad_arg ptt-install "$model_arg"; fi
+            cmd_uninstall
+            ;;
     esac
 }
 
