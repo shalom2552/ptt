@@ -17,6 +17,9 @@ PUNCTUATION = {
 # Spoken phrase to text. Stands on its own as a word.
 WORDS = {}
 
+# The next word is capitalized after any of these.
+SENTENCE_END = ".?!\n"
+
 
 def _phrase_lengths(*tables):
     return sorted({len(phrase.split()) for t in tables for phrase in t}, reverse=True)
@@ -42,7 +45,10 @@ def _replace(words):
                 i += size
                 break
         else:
-            out.append(words[i])
+            word = words[i]
+            if out and out[-1][-1:] in SENTENCE_END:
+                word = word[:1].upper() + word[1:]
+            out.append(word)
             i += 1
     return out
 
