@@ -22,13 +22,10 @@ ARGS=(
 # release off the device, so live mode does not need this.
 DEFER_ARGS=(--defer-output)
 PKGS=(wtype nerd-dictation-git)
-KEY=F12 # must match the keybind
-KEYCODE=88
+KEYCODE=88 # must match the keybind
 
 RUN="${XDG_RUNTIME_DIR:-/tmp}"
-LOCK="$RUN/ptt.lock"
-SESSION="$RUN/ptt.session" # cookie path and start stamp of the last begin
-STOP="$RUN/ptt.stop"       # stamp of the last release
+SESSION="$RUN/ptt.session" # cookie path of the last begin
 
 # One tray slot, so a notice replaces the last instead of stacking.
 notify() {
@@ -53,15 +50,6 @@ require_engine() {
 # The engine holds its cookie at mtime 0 while listening, stamps it on end.
 session_live() { [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]]; }
 
-stamp() { date +%s%N; } # ns, so two presses in one second still order
-
-# Stamp of the last release, 0 when there has been none.
-last_stop() {
-    local s=0
-    [[ -e $STOP ]] && read -r s <"$STOP"
-    printf '%s\n' "$s"
-}
-
 notify_state() { notify "normal" "$1" ptt "$2"; }
 
 # Tests the device, not the input group: a session predating its own gpasswd
@@ -78,14 +66,13 @@ can_watch() {
 end_session() {
     local cookie=$1
     # Watcher and release bind both arrive. The loser of the race must not
-    # end again, or the engine throws on the gone cookie.
-    exec 9>"$LOCK"
+    # end again, or the engine throws on the gone cookie. One lock per
+    # session, so an end of a session that is over blocks nothing.
+    exec 9>"$cookie.lock"
     flock -n 9 || return 0
     session_live "$cookie" || return 0
     # A late end of a superseded session must not talk over the live one.
-    local cur=''
-    [[ -e $SESSION ]] && read -r cur _ <"$SESSION"
-    [[ $cur == "$cookie" ]] && notify_state 1000 done
+    [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && notify_state 1000 done
     "$BIN" end --cookie "$cookie"
 }
 
@@ -98,48 +85,42 @@ watch_release() {
     fi
 }
 
-# A release that beats the engine to its cookie leaves end nothing to stop.
-catch_early_release() {
-    local cookie=$1 start=$2 deadline=$((SECONDS + 3))
-    while ((SECONDS < deadline)); do
-        session_live "$cookie" && break
-        sleep 0.1
-    done
-    (($(last_stop) > start)) || return 0
-    end_session "$cookie"
-}
-
 cmd_begin() {
     require_engine
-    local cookie prev pstart start
-    # Only a session still held blocks a new one. One already released is
-    # ending, however long its engine takes to type the text out.
-    if [[ -e $SESSION ]]; then
-        read -r prev pstart <"$SESSION"
-        if session_live "$prev" && (($(last_stop) < pstart)); then
-            exit 0
-        fi
-    fi
+    local prev='' cookie deadline
+    [[ -e $SESSION ]] && read -r prev <"$SESSION"
     cookie="$RUN/ptt.cookie.$$"
-    start=$(stamp)
+    if [[ -n $prev ]] && session_live "$prev"; then
+        # Only a session still held blocks a new one. One already released is
+        # ending, however long its engine takes to type the text out.
+        [[ -e $prev.stop ]] || exit 0
+    elif [[ -e $prev ]]; then
+        # The engine reads its run-on punctuation window off the cookie age.
+        cp -p "$prev" "$cookie"
+    fi
+    rm -f "$cookie.stop" # a recycled pid must not inherit a release
     local -a args=("${ARGS[@]}" --cookie "$cookie")
     if can_watch; then
         watch_release "$cookie" &
     else
         args+=("${DEFER_ARGS[@]}")
     fi
-    printf '%s %s\n' "$cookie" "$start" >"$SESSION"
+    printf '%s\n' "$cookie" >"$SESSION"
     notify_state 30000 listening
-    setsid -f "$BIN" begin "${args[@]}" # detached, caller returns at once
-    catch_early_release "$cookie" "$start"
+    setsid -f "$BIN" begin "${args[@]}" # detached, outlives this process
+    # A release that beats the engine to its cookie leaves end nothing to stop.
+    deadline=$((SECONDS + 3))
+    while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done
+    [[ -e $cookie.stop ]] || return 0
+    end_session "$cookie"
 }
 
 cmd_end() {
     command -v "$BIN" &>/dev/null || exit 0
-    stamp >"$STOP"
     [[ -e $SESSION ]] || exit 0
     local cookie
-    read -r cookie _ <"$SESSION"
+    read -r cookie <"$SESSION"
+    : >"$cookie.stop"
     end_session "$cookie"
 }
 
