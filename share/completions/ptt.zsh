@@ -24,7 +24,7 @@ spec=(
 )
 # --model belongs to install alone.
 if (( ${words[(I)install]} )); then
-    spec+=('--model[change the speech model]')
+    spec+=('(-m --model)'{-m,--model}'[change the speech model]')
 fi
 
 _arguments -s "${spec[@]}"

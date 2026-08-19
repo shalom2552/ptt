@@ -16,7 +16,7 @@ _ptt() {
     done
     # --model belongs to install alone.
     if [[ $cmd == install ]]; then
-        opts="$opts --model"
+        opts="$opts -m --model"
     fi
     mapfile -t COMPREPLY < <(compgen -W "$cmds $opts" -- "$cur")
 }

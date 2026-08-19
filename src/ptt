@@ -113,6 +113,7 @@ cmd_end() {
 
 CMD=''
 MODEL=0
+MODEL_ARG=''
 for a in "$@"; do
     case "$a" in
         -h | --help)
@@ -120,7 +121,10 @@ for a in "$@"; do
             exit 0
             ;;
         -s | --step) export PTT_STEP=1 ;;
-        --model) MODEL=1 ;;
+        -m | --model)
+            MODEL=1
+            MODEL_ARG="$a"
+            ;;
         begin | end | install | uninstall)
             if [[ -n $CMD ]]; then bad_arg ptt "$a"; fi
             CMD="$a"
@@ -130,7 +134,7 @@ for a in "$@"; do
 done
 
 # A flag may come before its command, so this waits for the whole line.
-if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt --model; fi
+if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt "$MODEL_ARG"; fi
 
 case "$CMD" in
     begin) cmd_begin ;;

@@ -408,7 +408,7 @@ cmd_uninstall() {
 }
 
 main() {
-    local a cmd='' model=0
+    local a cmd='' model=0 model_arg=''
     for a in "$@"; do
         case "$a" in
             -h | --help)
@@ -416,7 +416,10 @@ main() {
                 return 0
                 ;;
             -s | --step) PTT_STEP=1 ;;
-            --model) model=1 ;;
+            -m | --model)
+                model=1
+                model_arg="$a"
+                ;;
             install | uninstall)
                 if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
                 cmd="$a"
@@ -430,7 +433,7 @@ main() {
             if ((model)); then cmd_model; else cmd_install; fi
             ;;
         uninstall)
-            if ((model)); then bad_arg ptt-install --model; fi
+            if ((model)); then bad_arg ptt-install "$model_arg"; fi
             cmd_uninstall
             ;;
     esac
