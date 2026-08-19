@@ -18,19 +18,17 @@ ARGS=(
     --timeout 30
     --config "$PTT_ROOT/src/ptt-config.py"
 )
-# Deferred mode only. Without it wtype types during the hold, Hyprland loses
-# the key release, and dictation never stops. The watcher reads the release
-# off the device, so live mode does not need it.
+# Typing during the hold can eat the key release. The watcher reads the
+# release off the device, so live mode does not need this.
 DEFER_ARGS=(--defer-output)
 PKGS=(wtype nerd-dictation-git)
-# Must match the Hyprland bind.
-KEY=F12
+KEY=F12 # must match the keybind
 KEYCODE=88
 
-# A live session shows as "python3 /usr/bin/nerd-dictation begin ...".
-# Ending shows as "... end", which this must not match.
-PATTERN="$BIN begin"
-LOCK="${XDG_RUNTIME_DIR:-/tmp}/ptt.lock"
+RUN="${XDG_RUNTIME_DIR:-/tmp}"
+LOCK="$RUN/ptt.lock"
+SESSION="$RUN/ptt.session" # cookie path and start stamp of the last begin
+STOP="$RUN/ptt.stop"       # stamp of the last release
 
 # One tray slot, so a notice replaces the last instead of stacking.
 notify() {
@@ -52,13 +50,22 @@ require_engine() {
     fi
 }
 
-engine_running() { pgrep -f "$PATTERN" &>/dev/null; }
+# The engine holds its cookie at mtime 0 while listening, stamps it on end.
+session_live() { [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]]; }
+
+stamp() { date +%s%N; } # ns, so two presses in one second still order
+
+# Stamp of the last release, 0 when there has been none.
+last_stop() {
+    local s=0
+    [[ -e $STOP ]] && read -r s <"$STOP"
+    printf '%s\n' "$s"
+}
 
 notify_state() { notify "normal" "$1" ptt "$2"; }
 
-# True when the watcher has something to read. A session that predates its own
-# gpasswd is in the input group and still cannot open a device, so this tests
-# the device and not the group.
+# Tests the device, not the input group: a session predating its own gpasswd
+# is in the group and still cannot open one.
 can_watch() {
     local dev
     for dev in /dev/input/event*; do
@@ -67,48 +74,73 @@ can_watch() {
     return 1
 }
 
+# Ends one named session, never whichever one happens to be up.
+end_session() {
+    local cookie=$1
+    # Watcher and release bind both arrive. The loser of the race must not
+    # end again, or the engine throws on the gone cookie.
+    exec 9>"$LOCK"
+    flock -n 9 || return 0
+    session_live "$cookie" || return 0
+    # A late end of a superseded session must not talk over the live one.
+    local cur=''
+    [[ -e $SESSION ]] && read -r cur _ <"$SESSION"
+    [[ $cur == "$cookie" ]] && notify_state 1000 done
+    "$BIN" end --cookie "$cookie"
+}
+
 # Backgrounded by begin in live mode. Ends the session when the key comes up.
 watch_release() {
     if "$PTT_ROOT/src/ptt-keywatch" "$KEYCODE"; then
-        cmd_end
+        end_session "$1"
     else
         notify_warn ptt "key watcher failed, dictation stops on timeout"
     fi
 }
 
+# A release that beats the engine to its cookie leaves end nothing to stop.
+catch_early_release() {
+    local cookie=$1 start=$2 deadline=$((SECONDS + 3))
+    while ((SECONDS < deadline)); do
+        session_live "$cookie" && break
+        sleep 0.1
+    done
+    (($(last_stop) > start)) || return 0
+    end_session "$cookie"
+}
+
 cmd_begin() {
     require_engine
-    engine_running && exit 0
-    local -a args=("${ARGS[@]}")
+    local cookie prev pstart start
+    # Only a session still held blocks a new one. One already released is
+    # ending, however long its engine takes to type the text out.
+    if [[ -e $SESSION ]]; then
+        read -r prev pstart <"$SESSION"
+        if session_live "$prev" && (($(last_stop) < pstart)); then
+            exit 0
+        fi
+    fi
+    cookie="$RUN/ptt.cookie.$$"
+    start=$(stamp)
+    local -a args=("${ARGS[@]}" --cookie "$cookie")
     if can_watch; then
-        watch_release &
+        watch_release "$cookie" &
     else
         args+=("${DEFER_ARGS[@]}")
     fi
+    printf '%s %s\n' "$cookie" "$start" >"$SESSION"
     notify_state 30000 listening
     setsid -f "$BIN" begin "${args[@]}" # detached, caller returns at once
+    catch_early_release "$cookie" "$start"
 }
 
 cmd_end() {
     command -v "$BIN" &>/dev/null || exit 0
-    # Live mode reaches here twice, from the watcher and from the release
-    # bind. Two engine ends race, and the loser throws on the gone cookie.
-    exec 9>"$LOCK"
-    flock -n 9 || exit 0
-    # The watcher is backgrounded before begin spawns the engine, so a quick
-    # tap lands here while there is still nothing to end.
-    if can_watch; then
-        local deadline=$((SECONDS + 2))
-        while ((SECONDS < deadline)); do
-            engine_running && break
-            sleep 0.1
-        done
-    fi
-    notify_state 1000 done
-    # Without this guard a release with nothing running throws a Python
-    # traceback off a stale cookie.
-    engine_running || exit 0
-    "$BIN" end
+    stamp >"$STOP"
+    [[ -e $SESSION ]] || exit 0
+    local cookie
+    read -r cookie _ <"$SESSION"
+    end_session "$cookie"
 }
 
 CMD=''
