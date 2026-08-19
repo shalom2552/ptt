@@ -66,8 +66,8 @@ confirm() {
 run_cmd() {
     local note="$1"
     shift
-    printf '\n    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
-    printf '    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
+    printf '\n    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
+    printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
     if ! confirm "Execute?"; then
         log_warn "skipped: $*"
         return 1
