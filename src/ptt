@@ -136,10 +136,9 @@ case "$CMD" in
     begin) cmd_begin ;;
     end) cmd_end ;;
     install)
-        if ((MODEL)); then
-            exec "$PTT_ROOT/src/ptt-install" install --model
-        fi
-        exec "$PTT_ROOT/src/ptt-install" install
+        FLAGS=()
+        if ((MODEL)); then FLAGS=(--model); fi
+        exec "$PTT_ROOT/src/ptt-install" install "${FLAGS[@]}"
         ;;
     uninstall) exec "$PTT_ROOT/src/ptt-install" uninstall ;;
     *) usage ptt ;;

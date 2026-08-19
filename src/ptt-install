@@ -331,7 +331,7 @@ cmd_install() {
     fi
 }
 
-# The flag has one job, so it skips the stale link check a bare install runs.
+# Picks a model and nothing else, so no stale link check.
 cmd_model() {
     if ! is_installed; then
         log_error "ptt is not installed, run: ptt install"
@@ -430,8 +430,6 @@ main() {
             if ((model)); then cmd_model; else cmd_install; fi
             ;;
         uninstall)
-            # A flag may come before its command, so this waits for the
-            # whole line.
             if ((model)); then bad_arg ptt-install --model; fi
             cmd_uninstall
             ;;
