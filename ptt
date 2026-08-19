@@ -9,15 +9,16 @@ DIR="$(dirname "$(readlink -f "$0")")"
 BIN=nerd-dictation
 ARGS=(
     --simulate-input-tool=WTYPE
-    # Without this wtype types during the hold, Hyprland loses the key
-    # release, and dictation never stops.
-    --defer-output
     --idle-time=0.2
     --punctuate-from-previous-timeout=2
     --full-sentence
     # Hang backstop: exits on its own after 30s with no speech processed.
     --timeout 30
 )
+# Deferred mode only. Without it wtype types during the hold, Hyprland loses
+# the key release, and dictation never stops. Live mode reads the release off
+# the device instead, so it does not care what wtype does.
+DEFER_ARGS=(--defer-output)
 PKGS=(wtype nerd-dictation-git)
 # Must match the Hyprland bind.
 KEY=F12
@@ -52,14 +53,39 @@ require_engine() {
     fi
 }
 
+# Readability, not group membership. The group database says input the moment
+# gpasswd runs, but the running session lacks it until a full logout, which
+# would pick live mode and then hang with nothing to read.
+can_watch() {
+    local dev
+    for dev in /dev/input/event*; do
+        [[ -r $dev ]] && return 0
+    done
+    return 1
+}
+
 cmd_begin() {
     require_engine
     pgrep -f "$PATTERN" &>/dev/null && exit 0
-    "$BIN" begin "${ARGS[@]}"
+    local -a args=("${ARGS[@]}")
+    if can_watch; then
+        "$DIR/ptt-keywatch" "$KEYCODE" && "$DIR/ptt" end &
+    else
+        args+=("${DEFER_ARGS[@]}")
+    fi
+    "$BIN" begin "${args[@]}"
 }
 
 cmd_end() {
     require_engine
+    # The watcher is backgrounded before begin spawns the engine, so a quick
+    # tap can land here first. Wait for the engine rather than dropping the
+    # release on the floor.
+    local deadline=$((SECONDS + 2))
+    while ((SECONDS < deadline)); do
+        pgrep -f "$PATTERN" &>/dev/null && break
+        sleep 0.1
+    done
     # Without this guard a release with nothing running throws a Python
     # traceback off a stale cookie.
     pgrep -f "$PATTERN" &>/dev/null || exit 0
