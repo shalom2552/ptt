@@ -1,0 +1,4 @@
+# Agent skills, vendored from elsewhere. Not part of ptt.
+.agents/
+.claude/
+skills-lock.json
