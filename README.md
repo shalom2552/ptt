@@ -18,6 +18,10 @@ What ptt adds is the setup and the glue: an installer that puts the packages,
 the model, and the symlinks in place, and a small script your compositor calls
 on key press and key release.
 
+## Features
+
+- Punctuation marks support.
+
 ## Status
 
 Works on Arch with Hyprland and Wayland. Nothing else yet. Widening it to the
