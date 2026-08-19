@@ -56,6 +56,11 @@ require_engine() {
 
 engine_running() { pgrep -f "$PATTERN" &>/dev/null; }
 
+# One tray slot, so end replaces listening instead of stacking.
+notify_state() {
+    notify-send -h string:x-canonical-private-synchronous:ptt -t "$1" ptt "$2"
+}
+
 # True when the watcher has something to read. A session that predates its own
 # gpasswd is in the input group and still cannot open a device, so this tests
 # the device and not the group.
@@ -86,6 +91,7 @@ cmd_begin() {
     else
         args+=("${DEFER_ARGS[@]}")
     fi
+    notify_state 30000 listening
     "$BIN" begin "${args[@]}"
 }
 
@@ -104,6 +110,7 @@ cmd_end() {
             sleep 0.1
         done
     fi
+    notify_state 1000 done
     # Without this guard a release with nothing running throws a Python
     # traceback off a stale cookie.
     engine_running || exit 0
