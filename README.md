@@ -76,6 +76,7 @@ ptt install      install the stack, or reconfigure it
 ptt uninstall    remove the packages, model, and symlinks
 
 -s, --step       show each command and confirm it before it runs
+    --model      change the speech model, install only
 -h, --help       show this help
 ```
 

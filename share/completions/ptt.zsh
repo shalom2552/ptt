@@ -1,7 +1,7 @@
 #compdef ptt ptt-install
 
 local state
-local -a commands
+local -a commands global
 
 if [[ $service == ptt ]]; then
     commands=(
@@ -17,11 +17,24 @@ else
     )
 fi
 
+global=(
+    '(-h --help)'{-h,--help}'[show this help]'
+    '(-s --step)'{-s,--step}'[show each command and confirm it before it runs]'
+)
+
 _arguments -s \
-    '(-h --help)'{-h,--help}'[show this help]' \
-    '(-s --step)'{-s,--step}'[show each command and confirm it before it runs]' \
-    '1: :->command'
+    "${global[@]}" \
+    '1: :->command' \
+    '*:: :->option'
 
 case $state in
     command) _describe -t commands 'command' commands ;;
+    # --model belongs to install alone.
+    option)
+        if [[ $words[1] == install ]]; then
+            _arguments -s "${global[@]}" '--model[change the speech model]'
+        else
+            _arguments -s "${global[@]}"
+        fi
+        ;;
 esac

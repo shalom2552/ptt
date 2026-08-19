@@ -10,11 +10,13 @@ commands:
 
 options:
   -s, --step   show each command and confirm it before it runs
+      --model  change the speech model, install only
   -h, --help   show this help
 
 examples:
   ptt install
   ptt install --step
+  ptt install --model
   ptt uninstall
 
 begin and end are called by a keybind. install and uninstall are run by hand.
