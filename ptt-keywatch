@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# ptt-keywatch - block until a key is released, then exit. Runs in the
-# background off ptt begin, with no terminal, so it prints nothing.
+# ptt-keywatch - block until a key is released, then exit. Runs off ptt begin
+# with no terminal, so it prints nothing.
 import glob
 import os
 import select
@@ -34,7 +34,11 @@ def watch(keycode, fds):
                 os.close(fd)
                 fds.remove(fd)
                 continue
+            # A short read means the device is gone. Leaving the fd in the
+            # list would make select report it ready forever.
             if len(data) < EVENT_SIZE:
+                os.close(fd)
+                fds.remove(fd)
                 continue
             _, _, etype, code, value = struct.unpack(EVENT_FORMAT, data)
             if etype == EV_KEY and code == keycode and value == RELEASE:
