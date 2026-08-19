@@ -24,8 +24,9 @@ Works on Arch with Hyprland and Wayland. Nothing else yet. Widening it to the
 main distros is tracked in
 [issue #1](https://github.com/shalom2552/ptt/issues/1).
 
-Text currently appears all at once when you release the key. Live text as you
-speak is planned, see `docs/issues/03-keywatch-live-mode.md`.
+Text appears as you speak if ptt can read your input devices, which means being
+in the `input` group. Otherwise the whole utterance appears when you release the
+key. ptt picks the mode itself on every press, there is nothing to configure.
 
 ## Install
 
