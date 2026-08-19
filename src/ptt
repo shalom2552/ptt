@@ -18,8 +18,7 @@ ARGS=(
     --timeout 30
     --config "$PTT_ROOT/src/ptt-config.py"
 )
-# Typing during the hold can eat the key release. The watcher reads the
-# release off the device, so live mode does not need this.
+# Typing during the hold can eat the key release. Live mode has the watcher.
 DEFER_ARGS=(--defer-output)
 PKGS=(wtype nerd-dictation-git)
 KEYCODE=88 # must match the keybind
@@ -36,6 +35,8 @@ notify() {
 
 notify_warn() { notify "critical" 10000 "$1" "$2"; }
 
+notify_state() { notify "normal" "$1" ptt "$2"; }
+
 # Off a key press there is no terminal, so failures also go to the screen.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
       notify_warn "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
@@ -47,13 +48,7 @@ require_engine() {
     fi
 }
 
-# The engine holds its cookie at mtime 0 while listening, stamps it on end.
-session_live() { [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]]; }
-
-notify_state() { notify "normal" "$1" ptt "$2"; }
-
-# Tests the device, not the input group: a session predating its own gpasswd
-# is in the group and still cannot open one.
+# Tests the device, not the group: a fresh gpasswd needs a login to take.
 can_watch() {
     local dev
     for dev in /dev/input/event*; do
@@ -62,12 +57,13 @@ can_watch() {
     return 1
 }
 
+# The engine holds its cookie at mtime 0 while listening, stamps it on end.
+session_live() { [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]]; }
+
 # Ends one named session, never whichever one happens to be up.
 end_session() {
     local cookie=$1
-    # Watcher and release bind both arrive. The loser of the race must not
-    # end again, or the engine throws on the gone cookie. One lock per
-    # session, so an end of a session that is over blocks nothing.
+    # Watcher and release bind both arrive. The loser must not end again.
     exec 9>"$cookie.lock"
     flock -n 9 || return 0
     session_live "$cookie" || return 0
@@ -91,11 +87,10 @@ cmd_begin() {
     [[ -e $SESSION ]] && read -r prev <"$SESSION"
     cookie="$RUN/ptt.cookie.$$"
     if [[ -n $prev ]] && session_live "$prev"; then
-        # Only a session still held blocks a new one. One already released is
-        # ending, however long its engine takes to type the text out.
+        # Only a session still held blocks a new one. A released one is ending.
         [[ -e $prev.stop ]] || exit 0
     elif [[ -e $prev ]]; then
-        # The engine reads its run-on punctuation window off the cookie age.
+        # The engine reads its run-on punctuation off the cookie age.
         cp -p "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
