@@ -48,4 +48,4 @@ def _replace(words):
 
 
 def nerd_dictation_process(text):
-    return " ".join(_replace(text.split()))
+    return " ".join(_replace(text.split())).replace("\n ", "\n")
