@@ -69,6 +69,7 @@ through yay.
 Both ask for their own password, so a prompt under `yay -S` or `yay -Rns` is
 not ours.
 `--needed` on install, so a re-run changes nothing.
+`--noconfirm` on install, the plan already asked. Removals still confirm.
 
 ## Shell scripts
 

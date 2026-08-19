@@ -171,7 +171,6 @@ print_plan() {
     fi
     printf '\n'
     plan_step_note
-    plan_note "pacman and yay prompt for sudo themselves."
 }
 
 choose_model() {
@@ -191,7 +190,7 @@ choose_model() {
 install_model() {
     local i="$1"
     run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
-        yay -S --needed "${MODEL_PKGS[i]}"
+        yay -S --needed --noconfirm "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
     run_or_stop "point nerd-dictation at that model" \
         ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
@@ -227,16 +226,17 @@ EOF
 
 print_mode() {
     local group_added="${1:-0}"
-    printf '\n'
+    printf '\n%sMode:%s %s\n' "$C_BOLD" "$C_RESET" "$(arg "$(mode_desc)")"
+    printf '      %s%s.%s\n' "$C_DIM" "$(mode_effect)" "$C_RESET"
     if ((group_added)); then
-        log_warn "Log out and back in for the input group to apply."
-        log_warn "Until then ptt runs in deferred mode."
+        printf '\n'
+        plan_note "Log out and back in for the input group to apply."
+        plan_note "Until then ptt runs in deferred mode."
     elif group_in_db && ! group_in_session; then
-        log_warn "This session predates the input group membership."
-        log_warn "Log out and back in for live text."
+        printf '\n'
+        plan_note "This session predates the input group membership."
+        plan_note "Log out and back in for live text."
     fi
-    log_info "Mode: $(mode_desc)"
-    log_info "      $(mode_effect)."
 }
 
 first_run() {
@@ -248,9 +248,9 @@ first_run() {
     fi
 
     run_or_stop "install ${REPO_PKGS[*]} from pacman, types the text" \
-        sudo pacman -S --needed "${REPO_PKGS[@]}"
+        sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
     run_or_stop "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
-        yay -S --needed "${AUR_PKGS[@]}"
+        yay -S --needed --noconfirm "${AUR_PKGS[@]}"
 
     choose_model
     install_model "$PICK"
