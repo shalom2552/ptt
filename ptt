@@ -47,7 +47,7 @@ trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
         notify-send -t 10000 "Voice typing not installed" \
-            "Run: ~/.local/share/ptt/ptt install"
+            "Run: ${DIR/#$HOME/\~}/ptt install"
         exit 0
     fi
 }
