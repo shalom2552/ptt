@@ -13,6 +13,13 @@ MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
 USER_NAME="${USER:-$(id -un)}"
 
+ZSH_COMP_DIR=/usr/share/zsh/site-functions
+BASH_COMP_DIR=/usr/share/bash-completion/completions
+ZSH_COMP_LINK="$ZSH_COMP_DIR/_ptt"
+BASH_COMP_LINK="$BASH_COMP_DIR/ptt"
+ZSH_COMP_SRC="$PTT_ROOT/share/completions/ptt.zsh"
+BASH_COMP_SRC="$PTT_ROOT/share/completions/ptt.bash"
+
 REPO_PKGS=(wtype)
 AUR_PKGS=(nerd-dictation-git)
 
@@ -69,6 +76,71 @@ model_index_for_dir() {
     return 1
 }
 
+# A link this copy of the repo owns, as opposed to one left by another clone.
+link_current() {
+    [[ -L $1 && "$(readlink -f "$1")" == "$(readlink -f "$2")" ]]
+}
+
+# Completions are a convenience, so a declined step leaves the install good.
+link_completions() {
+    local linked=0
+    if [[ -d $ZSH_COMP_DIR ]] && run_cmd "link the zsh completion" \
+        sudo ln -sfn "$ZSH_COMP_SRC" "$ZSH_COMP_LINK"; then
+        linked=1
+    fi
+    if [[ -d $BASH_COMP_DIR ]] && run_cmd "link the bash completion" \
+        sudo ln -sfn "$BASH_COMP_SRC" "$BASH_COMP_LINK"; then
+        linked=1
+    fi
+    if ((linked)); then
+        log_info "Tab completion works in a new shell."
+    fi
+}
+
+# An earlier install links into wherever the clone was then. Moving it leaves
+# those links pointing at the old path.
+offer_relink() {
+    local -a stale=()
+    if [[ -L $BIN_LINK ]] && ! link_current "$BIN_LINK" "$PTT_ROOT/ptt"; then
+        stale+=(bin)
+    fi
+    if [[ -L $ZSH_COMP_LINK ]] && ! link_current "$ZSH_COMP_LINK" "$ZSH_COMP_SRC"; then
+        stale+=(zsh)
+    fi
+    if [[ -L $BASH_COMP_LINK ]] && ! link_current "$BASH_COMP_LINK" "$BASH_COMP_SRC"; then
+        stale+=(bash)
+    fi
+    ((${#stale[@]})) || return 0
+
+    local item n=0
+    heading "ptt has moved"
+    plan_title "ptt install will:"
+    for item in "${stale[@]}"; do
+        case "$item" in
+            bin) plan_line "$((++n))" "repoint $(arg "${BIN_LINK/#$HOME/\~}") at this copy" ;;
+            zsh) plan_line "$((++n))" "repoint $(arg "$ZSH_COMP_LINK")" ;;
+            bash) plan_line "$((++n))" "repoint $(arg "$BASH_COMP_LINK")" ;;
+        esac
+    done
+    printf '\n'
+    plan_step_note
+    if ! confirm "Proceed?"; then
+        log_warn "The links still point at the old path."
+        return 0
+    fi
+
+    for item in "${stale[@]}"; do
+        case "$item" in
+            bin) run_cmd "repoint ptt on PATH" \
+                ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK" || true ;;
+            zsh) run_cmd "repoint the zsh completion" \
+                sudo ln -sfn "$ZSH_COMP_SRC" "$ZSH_COMP_LINK" || true ;;
+            bash) run_cmd "repoint the bash completion" \
+                sudo ln -sfn "$BASH_COMP_SRC" "$BASH_COMP_LINK" || true ;;
+        esac
+    done
+}
+
 current_model_dir() {
     local target
     target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
@@ -83,6 +155,12 @@ print_plan() {
     plan_line "$((++n))" "install a vosk model, picked from a menu"
     plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
     plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
+    if [[ -d $ZSH_COMP_DIR ]]; then
+        plan_line "$((++n))" "link the zsh completion into $(arg "$ZSH_COMP_DIR")"
+    fi
+    if [[ -d $BASH_COMP_DIR ]]; then
+        plan_line "$((++n))" "link the bash completion into $(arg "$BASH_COMP_DIR")"
+    fi
     if ! group_in_db; then
         plan_line "$((++n))" "offer to join the $(arg input) group for live text"
     fi
@@ -175,6 +253,7 @@ first_run() {
     mkdir -p "$(dirname "$BIN_LINK")"
     run_or_stop "link ptt onto PATH for terminal use" \
         ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    link_completions
 
     local group_added=0
     if ! group_in_db; then
@@ -239,6 +318,7 @@ installed_model_pkgs() {
 
 cmd_install() {
     if is_installed; then
+        offer_relink
         menu_installed
     else
         first_run
@@ -251,13 +331,15 @@ cmd_uninstall() {
     mapfile -t -O "${#rm_pkgs[@]}" rm_pkgs < <(installed_model_pkgs)
 
     # Only offer what is actually there.
-    local do_cfg=0 do_link=0 do_group=0 n=0
+    local do_cfg=0 do_link=0 do_group=0 do_zsh=0 do_bash=0 n=0
     if [[ -e $ND_CONFIG ]]; then do_cfg=1; fi
     if [[ -e $BIN_LINK || -L $BIN_LINK ]]; then do_link=1; fi
+    if [[ -L $ZSH_COMP_LINK ]]; then do_zsh=1; fi
+    if [[ -L $BASH_COMP_LINK ]]; then do_bash=1; fi
     if group_in_db; then do_group=1; fi
 
     heading "ptt uninstall"
-    if ((${#rm_pkgs[@]} == 0 && !do_cfg && !do_link && !do_group)); then
+    if ((${#rm_pkgs[@]} == 0 && !do_cfg && !do_link && !do_zsh && !do_bash && !do_group)); then
         log_info "Nothing to remove, ptt is not installed."
         return 0
     fi
@@ -271,6 +353,12 @@ cmd_uninstall() {
     fi
     if ((do_link)); then
         plan_line "$((++n))" "remove $(arg "${BIN_LINK/#$HOME/\~}")"
+    fi
+    if ((do_zsh)); then
+        plan_line "$((++n))" "remove $(arg "$ZSH_COMP_LINK")"
+    fi
+    if ((do_bash)); then
+        plan_line "$((++n))" "remove $(arg "$BASH_COMP_LINK")"
     fi
     if ((do_group)); then
         plan_line "$((++n))" "leave the $(arg input) group"
@@ -292,6 +380,12 @@ cmd_uninstall() {
     fi
     if ((do_link)); then
         run_cmd "unlink ptt from PATH" rm -f "$BIN_LINK" || true
+    fi
+    if ((do_zsh)); then
+        run_cmd "unlink the zsh completion" sudo rm -f "$ZSH_COMP_LINK" || true
+    fi
+    if ((do_bash)); then
+        run_cmd "unlink the bash completion" sudo rm -f "$BASH_COMP_LINK" || true
     fi
     if ((do_group)) && ask_cmd "leave the input group" \
         sudo gpasswd -d "$USER_NAME" input; then

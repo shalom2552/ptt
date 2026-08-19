@@ -21,6 +21,7 @@ on key press and key release.
 ## Features
 
 - Punctuation marks support.
+- Tab completion in zsh and bash.
 
 ## Status
 
@@ -40,9 +41,14 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
+The clone path is only a suggestion. Any path works, the installer links from
+wherever the clone is. Move it later and re-run the installer, it offers to
+repoint the links.
+
 The installer shows a plan, asks once, then announces each command as it runs.
-It lets you pick a speech model. Re-running it gives a small menu instead of
-reinstalling.
+It lets you pick a speech model, and links the zsh and bash completions if
+those directories are there. Tab completion works in a new shell. Re-running it
+gives a small menu instead of reinstalling.
 
 Pass `--step` to see each command and confirm it before it runs:
 
