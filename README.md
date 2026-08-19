@@ -65,12 +65,12 @@ Then `hyprctl reload`.
 
 ```
 ptt begin        start dictating
-ptt end          stop, text is typed
-ptt install      install, or reconfigure
-ptt uninstall    remove packages, model, and symlinks
+ptt end          stop dictating and type the text
+ptt install      install the stack, or reconfigure it
+ptt uninstall    remove the packages, model, and symlinks
 
 -s, --step       show each command and confirm it before it runs
--h, --help       show the help
+-h, --help       show this help
 ```
 
 You normally only run `install` and `uninstall` by hand. `begin` and `end` are
