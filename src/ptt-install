@@ -13,6 +13,12 @@ MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
 USER_NAME="${USER:-$(id -un)}"
 
+# Completions, one column per shell. The link's directory belongs to the shell,
+# so a shell that is not installed has no directory and is skipped.
+COMP_SHELLS=(zsh bash)
+COMP_LINKS=(/usr/share/zsh/site-functions/_ptt /usr/share/bash-completion/completions/ptt)
+COMP_SRCS=("$PTT_ROOT/share/completions/ptt.zsh" "$PTT_ROOT/share/completions/ptt.bash")
+
 REPO_PKGS=(wtype)
 AUR_PKGS=(nerd-dictation-git)
 
@@ -38,11 +44,9 @@ group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
 
 mode_desc() {
     if group_in_session; then
-        echo "live (in input group)"
-    elif group_in_db; then
-        echo "deferred until logout (in input group, session predates it)"
+        echo "live"
     else
-        echo "deferred (not in input group)"
+        echo "deferred"
     fi
 }
 
@@ -69,6 +73,76 @@ model_index_for_dir() {
     return 1
 }
 
+# True when the link is there and points at this copy of the repo.
+link_current() {
+    [[ -L $1 && "$(readlink -f "$1")" == "$(readlink -f "$2")" ]]
+}
+
+comp_dir() { dirname "${COMP_LINKS[$1]}"; }
+
+# A declined link skips and the install goes on, completions are a convenience.
+link_completions() {
+    local i linked=0
+    for i in "${!COMP_SHELLS[@]}"; do
+        [[ -d $(comp_dir "$i") ]] || continue
+        if run_cmd "link the ${COMP_SHELLS[i]} completion" \
+            sudo ln -sfn "${COMP_SRCS[i]}" "${COMP_LINKS[i]}"; then
+            linked=1
+        fi
+    done
+    if ((linked)); then
+        log_info "Tab completion works in a new shell."
+    fi
+}
+
+# Links this copy should own and does not: left behind by a move, or never
+# made because the install predates them.
+offer_links() {
+    local -a todo=()
+    local i
+    if [[ -L $BIN_LINK ]] && ! link_current "$BIN_LINK" "$PTT_ROOT/ptt"; then
+        todo+=(bin)
+    fi
+    for i in "${!COMP_SHELLS[@]}"; do
+        [[ -d $(comp_dir "$i") ]] || continue
+        if ! link_current "${COMP_LINKS[i]}" "${COMP_SRCS[i]}"; then
+            todo+=("$i")
+        fi
+    done
+    ((${#todo[@]})) || return 0
+
+    local item n=0
+    heading "ptt links"
+    plan_title "ptt install will:"
+    for item in "${todo[@]}"; do
+        if [[ $item == bin ]]; then
+            plan_line "$((++n))" "point $(arg "${BIN_LINK/#$HOME/\~}") at this copy"
+        else
+            plan_line "$((++n))" "point $(arg "${COMP_LINKS[item]}") at this copy"
+        fi
+    done
+    printf '\n'
+    plan_step_note
+    if ! confirm "Proceed?"; then
+        log_warn "The links are left as they are."
+        return 0
+    fi
+
+    local linked=0
+    for item in "${todo[@]}"; do
+        if [[ $item == bin ]]; then
+            run_cmd "point ptt on PATH at this copy" \
+                ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK" || true
+        elif run_cmd "point the ${COMP_SHELLS[item]} completion at this copy" \
+            sudo ln -sfn "${COMP_SRCS[item]}" "${COMP_LINKS[item]}"; then
+            linked=1
+        fi
+    done
+    if ((linked)); then
+        log_info "Tab completion works in a new shell."
+    fi
+}
+
 current_model_dir() {
     local target
     target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
@@ -83,12 +157,18 @@ print_plan() {
     plan_line "$((++n))" "install a vosk model, picked from a menu"
     plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
     plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
+    local i
+    for i in "${!COMP_SHELLS[@]}"; do
+        if [[ -d $(comp_dir "$i") ]]; then
+            plan_line "$((++n))" \
+                "link the ${COMP_SHELLS[i]} completion into $(arg "$(comp_dir "$i")")"
+        fi
+    done
     if ! group_in_db; then
         plan_line "$((++n))" "offer to join the $(arg input) group for live text"
     fi
     printf '\n'
     plan_step_note
-    plan_note "pacman and yay prompt for sudo themselves."
 }
 
 choose_model() {
@@ -108,7 +188,7 @@ choose_model() {
 install_model() {
     local i="$1"
     run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
-        yay -S --needed "${MODEL_PKGS[i]}"
+        yay -S --needed --noconfirm "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
     run_or_stop "point nerd-dictation at that model" \
         ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
@@ -132,7 +212,6 @@ print_bind_help() {
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
     local p="${PTT_ROOT/#$HOME/\~}/ptt"
     cat <<EOF
-
 No keybind found. Add to the Hyprland config:
 
   hl.bind("F12", hl.dsp.exec_cmd("$p begin"))
@@ -144,16 +223,15 @@ EOF
 
 print_mode() {
     local group_added="${1:-0}"
-    printf '\n'
+    field mode "$(mode_desc)" "$(mode_effect)"
     if ((group_added)); then
-        log_warn "Log out and back in for the input group to apply."
-        log_warn "Until then ptt runs in deferred mode."
+        printf '\n'
+        note "Log out and back in for the input group to apply."
     elif group_in_db && ! group_in_session; then
-        log_warn "This session predates the input group membership."
-        log_warn "Log out and back in for live text."
+        printf '\n'
+        note "This session predates the input group membership."
+        note "Log out and back in for live text."
     fi
-    log_info "Mode: $(mode_desc)"
-    log_info "      $(mode_effect)."
 }
 
 first_run() {
@@ -165,36 +243,45 @@ first_run() {
     fi
 
     run_or_stop "install ${REPO_PKGS[*]} from pacman, types the text" \
-        sudo pacman -S --needed "${REPO_PKGS[@]}"
+        sudo pacman -S --needed --noconfirm "${REPO_PKGS[@]}"
     run_or_stop "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
-        yay -S --needed "${AUR_PKGS[@]}"
+        yay -S --needed --noconfirm "${AUR_PKGS[@]}"
 
     choose_model
-    install_model "$PICK"
+    local model_idx="$PICK"
+    install_model "$model_idx"
 
     mkdir -p "$(dirname "$BIN_LINK")"
     run_or_stop "link ptt onto PATH for terminal use" \
         ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    link_completions
 
     local group_added=0
     if ! group_in_db; then
         if offer_group; then group_added=1; fi
     fi
 
-    heading "Done"
-    print_bind_help
+    heading "ptt installed"
+    printf '\n'
+    field packages "${REPO_PKGS[*]} ${AUR_PKGS[*]}"
+    field model "${MODEL_DIRS[model_idx]} (${MODEL_VERS[model_idx]})"
+    field ptt "${BIN_LINK/#$HOME/\~}"
     print_mode "$group_added"
+    printf '\n'
+    print_bind_help
 }
 
 action_change_model() {
     choose_model
     install_model "$PICK"
+    printf '\n'
     print_mode 0
 }
 
 action_join_group() {
     local group_added=0
     if offer_group; then group_added=1; fi
+    printf '\n'
     print_mode "$group_added"
 }
 
@@ -215,12 +302,10 @@ menu_installed() {
     labels+=("quit") actions+=(:)
 
     heading "ptt is installed"
-    printf '\n  current model: %s (%s)\n' "$dir" "$ver"
-    printf '  mode:          %s\n\n' "$(mode_desc)"
-    if group_in_db && ! group_in_session; then
-        log_warn "Log out and back in for live text to take effect."
-        printf '\n'
-    fi
+    printf '\n'
+    field model "$dir ($ver)"
+    print_mode 0
+    printf '\n'
     local i
     for i in "${!labels[@]}"; do
         printf '  %d) %s\n' "$((i + 1))" "${labels[i]}"
@@ -239,6 +324,7 @@ installed_model_pkgs() {
 
 cmd_install() {
     if is_installed; then
+        offer_links
         menu_installed
     else
         first_run
@@ -251,13 +337,17 @@ cmd_uninstall() {
     mapfile -t -O "${#rm_pkgs[@]}" rm_pkgs < <(installed_model_pkgs)
 
     # Only offer what is actually there.
-    local do_cfg=0 do_link=0 do_group=0 n=0
+    local do_cfg=0 do_link=0 do_group=0 n=0 i
+    local -a rm_comps=()
     if [[ -e $ND_CONFIG ]]; then do_cfg=1; fi
     if [[ -e $BIN_LINK || -L $BIN_LINK ]]; then do_link=1; fi
+    for i in "${!COMP_SHELLS[@]}"; do
+        if [[ -L ${COMP_LINKS[i]} ]]; then rm_comps+=("$i"); fi
+    done
     if group_in_db; then do_group=1; fi
 
     heading "ptt uninstall"
-    if ((${#rm_pkgs[@]} == 0 && !do_cfg && !do_link && !do_group)); then
+    if ((${#rm_pkgs[@]} == 0 && ${#rm_comps[@]} == 0 && !do_cfg && !do_link && !do_group)); then
         log_info "Nothing to remove, ptt is not installed."
         return 0
     fi
@@ -272,6 +362,9 @@ cmd_uninstall() {
     if ((do_link)); then
         plan_line "$((++n))" "remove $(arg "${BIN_LINK/#$HOME/\~}")"
     fi
+    for i in "${rm_comps[@]:+${rm_comps[@]}}"; do
+        plan_line "$((++n))" "remove $(arg "${COMP_LINKS[i]}")"
+    done
     if ((do_group)); then
         plan_line "$((++n))" "leave the $(arg input) group"
     fi
@@ -293,10 +386,14 @@ cmd_uninstall() {
     if ((do_link)); then
         run_cmd "unlink ptt from PATH" rm -f "$BIN_LINK" || true
     fi
+    for i in "${rm_comps[@]:+${rm_comps[@]}}"; do
+        run_cmd "unlink the ${COMP_SHELLS[i]} completion" \
+            sudo rm -f "${COMP_LINKS[i]}" || true
+    done
     if ((do_group)) && ask_cmd "leave the input group" \
         sudo gpasswd -d "$USER_NAME" input; then
-        log_warn "The input group is dropped in the database."
-        log_warn "Log out and back in to clear it from this session."
+        log_info "The input group is dropped in the database."
+        log_info "Log out and back in to clear it from this session."
     fi
     log_info "Done."
 }

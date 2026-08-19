@@ -83,12 +83,25 @@ plan_note() { printf '%s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
 
 plan_step_note() {
     if ((PTT_STEP)); then
-        plan_note "Each command is shown for confirmation before it runs."
+        plan_note "Each step is confirmed before it runs."
     else
-        plan_note "Each command is shown as it runs."
-        plan_note "--step confirms each one first."
+        plan_note "tip: run with --step to confirm each step."
     fi
 }
+
+# Result block. A label column and a value, under a heading, no level prefix.
+FIELD_W=10
+
+# The third argument is a dim tail on the value, for what the value means.
+field() {
+    printf '  %-*s %s%s%s' "$FIELD_W" "$1" "$C_ARG" "$2" "$C_RESET"
+    if [[ -n ${3:-} ]]; then
+        printf ' %s- %s%s' "$C_DIM" "$3" "$C_RESET"
+    fi
+    printf '\n'
+}
+
+note() { printf '  %s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
 
 usage() { cat "$PTT_ROOT/share/help/$1.txt"; }
 

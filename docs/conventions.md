@@ -25,6 +25,10 @@ Headings are the exception: the tag, no level, dim rules around it.
 ────────────────────────────────────────────────────────
 ```
 
+A result block under a heading is the other exception: label column, green
+value, a dim tail for what the value means. Notes follow the block, dim, after
+a blank line.
+
 Colors: cyan tag and step numbers, green values, bold green commands, dim `$`,
 `#`, and asides, yellow warnings, red errors. Plain text off a tty.
 Two short lines beat one long one. Wrap past ~70 columns.
@@ -50,7 +54,8 @@ Execute? [n/Y]
 ```
 
 Declining stops an install. During uninstall it skips one command and
-continues, since the removals are independent.
+continues, since the removals are independent. A completion link is the same
+exception: it skips and the install goes on, since completion is a convenience.
 Prompts default to yes (`[n/Y]`). Menus name their default in the hint
 (`Choice [1-2, default 2]`) and default to the harmless option.
 
@@ -68,6 +73,7 @@ through yay.
 Both ask for their own password, so a prompt under `yay -S` or `yay -Rns` is
 not ours.
 `--needed` on install, so a re-run changes nothing.
+`--noconfirm` on install, the plan already asked. Removals still confirm.
 
 ## Shell scripts
 
