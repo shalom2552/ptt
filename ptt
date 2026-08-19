@@ -9,15 +9,16 @@ DIR="$(dirname "$(readlink -f "$0")")"
 BIN=nerd-dictation
 ARGS=(
     --simulate-input-tool=WTYPE
-    # Without this wtype types during the hold, Hyprland loses the key
-    # release, and dictation never stops.
-    --defer-output
     --idle-time=0.2
     --punctuate-from-previous-timeout=2
     --full-sentence
     # Hang backstop: exits on its own after 30s with no speech processed.
     --timeout 30
 )
+# Deferred mode only. Without it wtype types during the hold, Hyprland loses
+# the key release, and dictation never stops. The watcher reads the release
+# off the device, so live mode does not need it.
+DEFER_ARGS=(--defer-output)
 PKGS=(wtype nerd-dictation-git)
 # Must match the Hyprland bind.
 KEY=F12
@@ -26,6 +27,7 @@ KEYCODE=88
 # A live session shows as "python3 /usr/bin/nerd-dictation begin ...".
 # Ending shows as "... end", which this must not match.
 PATTERN="$BIN begin"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/ptt.lock"
 
 if [[ -t 1 ]]; then
     C_RESET=$'\e[0m'
@@ -52,17 +54,66 @@ require_engine() {
     fi
 }
 
+engine_running() { pgrep -f "$PATTERN" &>/dev/null; }
+
+# One tray slot, so end replaces listening instead of stacking.
+notify_state() {
+    notify-send -h string:x-canonical-private-synchronous:ptt -t "$1" ptt "$2"
+}
+
+# True when the watcher has something to read. A session that predates its own
+# gpasswd is in the input group and still cannot open a device, so this tests
+# the device and not the group.
+can_watch() {
+    local dev
+    for dev in /dev/input/event*; do
+        [[ -r $dev ]] && return 0
+    done
+    return 1
+}
+
+# Backgrounded by begin in live mode. Ends the session when the key comes up.
+watch_release() {
+    if "$DIR/ptt-keywatch" "$KEYCODE"; then
+        cmd_end
+    else
+        notify-send -u critical -t 10000 "ptt" \
+            "key watcher failed, dictation stops on timeout"
+    fi
+}
+
 cmd_begin() {
     require_engine
-    pgrep -f "$PATTERN" &>/dev/null && exit 0
-    "$BIN" begin "${ARGS[@]}"
+    engine_running && exit 0
+    local -a args=("${ARGS[@]}")
+    if can_watch; then
+        watch_release &
+    else
+        args+=("${DEFER_ARGS[@]}")
+    fi
+    notify_state 30000 listening
+    "$BIN" begin "${args[@]}"
 }
 
 cmd_end() {
     require_engine
+    # Live mode reaches here twice, from the watcher and from the release
+    # bind. Two engine ends race, and the loser throws on the gone cookie.
+    exec 9>"$LOCK"
+    flock -n 9 || exit 0
+    # The watcher is backgrounded before begin spawns the engine, so a quick
+    # tap lands here while there is still nothing to end.
+    if can_watch; then
+        local deadline=$((SECONDS + 2))
+        while ((SECONDS < deadline)); do
+            engine_running && break
+            sleep 0.1
+        done
+    fi
+    notify_state 1000 done
     # Without this guard a release with nothing running throws a Python
     # traceback off a stale cookie.
-    pgrep -f "$PATTERN" &>/dev/null || exit 0
+    engine_running || exit 0
     "$BIN" end
 }
 
