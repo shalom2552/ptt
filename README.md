@@ -1,0 +1,61 @@
+# ptt
+
+Push to talk voice typing on Linux. Hold a key, speak, release, and the text is
+typed into whatever window has focus.
+
+## What it is
+
+A wrapper. ptt does no speech recognition and no typing of its own. It glues
+together tools that already exist and makes them easy to set up and bind to a
+key:
+
+- [nerd-dictation](https://github.com/ideasman42/nerd-dictation) with
+  [vosk](https://alphacephei.com/vosk/) for offline speech to text
+- [wtype](https://github.com/atx/wtype) to type the result into the focused
+  window
+
+What ptt adds is the setup and the glue: an installer that puts the packages,
+the model, and the symlinks in place, and a small script your compositor calls
+on key press and key release.
+
+## Status
+
+Works on Arch with Hyprland and Wayland. Nothing else yet. Widening it to the
+main distros is tracked in
+[issue #1](https://github.com/shalom2552/ptt/issues/1).
+
+Text currently appears all at once when you release the key. Live text as you
+speak is planned, see `docs/issues/03-keywatch-live-mode.md`.
+
+## Install
+
+```
+git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
+~/.local/share/ptt/ptt install
+```
+
+The installer shows a plan, asks before every command it runs, and lets you pick
+a speech model. Re-running it gives a small menu instead of reinstalling.
+
+## Bind a key
+
+Hyprland, press and release:
+
+```lua
+hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
+hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })
+```
+
+Then `hyprctl reload`.
+
+## Usage
+
+```
+ptt begin        start dictating
+ptt end          stop, text is typed
+ptt install      install, or reconfigure
+ptt uninstall    remove packages, model, and symlinks
+```
+
+You normally only run `install` and `uninstall` by hand. `begin` and `end` are
+what the keybind calls.

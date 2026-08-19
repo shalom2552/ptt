@@ -2,7 +2,7 @@
 # ptt-install - install, re-configure, or remove the ptt voice typing stack.
 set -Eeuo pipefail
 
-PTT_DIR="$HOME/.local/share/ptt"
+PTT_DIR="$(dirname "$(readlink -f "$0")")"
 BIN_LINK="$HOME/.local/bin/ptt"
 ND_CONFIG="$HOME/.config/nerd-dictation"
 MODEL_LINK="$ND_CONFIG/model"
@@ -213,12 +213,13 @@ print_bind_help() {
         return
     fi
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
-    cat <<'EOF'
+    local p="${PTT_DIR/#$HOME/\~}/ptt"
+    cat <<EOF
 
 No keybind found. Add to ~/.config/hypr/modules/machine.lua:
 
-  hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
-  hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })
+  hl.bind("F12", hl.dsp.exec_cmd("$p begin"))
+  hl.bind("F12", hl.dsp.exec_cmd("$p end"), { release = true })
 
 Then: hyprctl reload
 EOF
