@@ -44,11 +44,9 @@ group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
 
 mode_desc() {
     if group_in_session; then
-        echo "live (in input group)"
-    elif group_in_db; then
-        echo "deferred until logout (in input group, session predates it)"
+        echo "live"
     else
-        echo "deferred (not in input group)"
+        echo "deferred"
     fi
 }
 
@@ -214,7 +212,6 @@ print_bind_help() {
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
     local p="${PTT_ROOT/#$HOME/\~}/ptt"
     cat <<EOF
-
 No keybind found. Add to the Hyprland config:
 
   hl.bind("F12", hl.dsp.exec_cmd("$p begin"))
@@ -226,16 +223,14 @@ EOF
 
 print_mode() {
     local group_added="${1:-0}"
-    printf '\n%sMode:%s %s\n' "$C_BOLD" "$C_RESET" "$(arg "$(mode_desc)")"
-    printf '      %s%s.%s\n' "$C_DIM" "$(mode_effect)" "$C_RESET"
+    field mode "$(mode_desc)" "$(mode_effect)"
     if ((group_added)); then
         printf '\n'
-        plan_note "Log out and back in for the input group to apply."
-        plan_note "Until then ptt runs in deferred mode."
+        note "Log out and back in for the input group to apply."
     elif group_in_db && ! group_in_session; then
         printf '\n'
-        plan_note "This session predates the input group membership."
-        plan_note "Log out and back in for live text."
+        note "This session predates the input group membership."
+        note "Log out and back in for live text."
     fi
 }
 
@@ -253,7 +248,8 @@ first_run() {
         yay -S --needed --noconfirm "${AUR_PKGS[@]}"
 
     choose_model
-    install_model "$PICK"
+    local model_idx="$PICK"
+    install_model "$model_idx"
 
     mkdir -p "$(dirname "$BIN_LINK")"
     run_or_stop "link ptt onto PATH for terminal use" \
@@ -265,20 +261,27 @@ first_run() {
         if offer_group; then group_added=1; fi
     fi
 
-    heading "Done"
-    print_bind_help
+    heading "ptt installed"
+    printf '\n'
+    field packages "${REPO_PKGS[*]} ${AUR_PKGS[*]}"
+    field model "${MODEL_DIRS[model_idx]} (${MODEL_VERS[model_idx]})"
+    field ptt "${BIN_LINK/#$HOME/\~}"
     print_mode "$group_added"
+    printf '\n'
+    print_bind_help
 }
 
 action_change_model() {
     choose_model
     install_model "$PICK"
+    printf '\n'
     print_mode 0
 }
 
 action_join_group() {
     local group_added=0
     if offer_group; then group_added=1; fi
+    printf '\n'
     print_mode "$group_added"
 }
 
@@ -299,12 +302,10 @@ menu_installed() {
     labels+=("quit") actions+=(:)
 
     heading "ptt is installed"
-    printf '\n  current model: %s (%s)\n' "$dir" "$ver"
-    printf '  mode:          %s\n\n' "$(mode_desc)"
-    if group_in_db && ! group_in_session; then
-        log_warn "Log out and back in for live text to take effect."
-        printf '\n'
-    fi
+    printf '\n'
+    field model "$dir ($ver)"
+    print_mode 0
+    printf '\n'
     local i
     for i in "${!labels[@]}"; do
         printf '  %d) %s\n' "$((i + 1))" "${labels[i]}"
@@ -391,8 +392,8 @@ cmd_uninstall() {
     done
     if ((do_group)) && ask_cmd "leave the input group" \
         sudo gpasswd -d "$USER_NAME" input; then
-        log_warn "The input group is dropped in the database."
-        log_warn "Log out and back in to clear it from this session."
+        log_info "The input group is dropped in the database."
+        log_info "Log out and back in to clear it from this session."
     fi
     log_info "Done."
 }

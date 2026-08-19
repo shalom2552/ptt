@@ -25,6 +25,10 @@ Headings are the exception: the tag, no level, dim rules around it.
 ────────────────────────────────────────────────────────
 ```
 
+A result block under a heading is the other exception: label column, green
+value, a dim tail for what the value means. Notes follow the block, dim, after
+a blank line.
+
 Colors: cyan tag and step numbers, green values, bold green commands, dim `$`,
 `#`, and asides, yellow warnings, red errors. Plain text off a tty.
 Two short lines beat one long one. Wrap past ~70 columns.

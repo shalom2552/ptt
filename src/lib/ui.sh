@@ -89,6 +89,20 @@ plan_step_note() {
     fi
 }
 
+# Result block. A label column and a value, under a heading, no level prefix.
+FIELD_W=10
+
+# The third argument is a dim tail on the value, for what the value means.
+field() {
+    printf '  %-*s %s%s%s' "$FIELD_W" "$1" "$C_ARG" "$2" "$C_RESET"
+    if [[ -n ${3:-} ]]; then
+        printf ' %s- %s%s' "$C_DIM" "$3" "$C_RESET"
+    fi
+    printf '\n'
+}
+
+note() { printf '  %s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
+
 usage() { cat "$PTT_ROOT/share/help/$1.txt"; }
 
 bad_arg() {
