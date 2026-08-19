@@ -1,5 +1,5 @@
-# ui.sh - headings, prompts, and plan output. Uses the colors and log
-# functions from log.sh, which has to be sourced first.
+# ui.sh - headings, prompts, plan output, running commands, and help. Uses
+# the colors and log functions from log.sh, which has to be sourced first.
 
 rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
 
@@ -20,8 +20,12 @@ confirm() {
     esac
 }
 
-# Shows the exact command and what it is for, then runs it only if confirmed.
-run_cmd() {
+PTT_STEP="${PTT_STEP:-0}"
+
+announce() { log_info "$C_CMD$*$C_RESET"; }
+
+# A choice the user makes, so it is asked in both modes.
+ask_cmd() {
     local note="$1"
     shift
     printf '\n    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
@@ -33,8 +37,19 @@ run_cmd() {
     "$@"
 }
 
+# A mechanic, covered by the plan already agreed to. Only --step stops for it.
+run_cmd() {
+    if ((PTT_STEP)); then
+        ask_cmd "$@"
+        return
+    fi
+    shift
+    announce "$@"
+    "$@"
+}
+
 # Same, but a declined command means the rest of the run is pointless.
-step() {
+run_or_stop() {
     run_cmd "$@" || {
         log_warn "Stopped. Nothing further was done."
         exit 1
@@ -65,3 +80,20 @@ plan_title() { printf '\n%s%s%s\n\n' "$C_BOLD" "$1" "$C_RESET"; }
 plan_line() { printf '  %s%d.%s %s\n' "$C_NUM" "$1" "$C_RESET" "$2"; }
 
 plan_note() { printf '%s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
+
+plan_step_note() {
+    if ((PTT_STEP)); then
+        plan_note "Every command is shown for confirmation before it runs."
+    else
+        plan_note "Each command is shown as it runs."
+        plan_note "Pass --step to confirm each one first."
+    fi
+}
+
+usage() { cat "$PTT_ROOT/share/help/$1.txt"; }
+
+bad_arg() {
+    log_error "unexpected argument: $2"
+    usage "$1" >&2
+    exit 1
+}

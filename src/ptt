@@ -5,6 +5,7 @@ set -Eeuo pipefail
 
 PTT_ROOT="$(dirname "$(dirname "$(readlink -f "$0")")")"
 source "$PTT_ROOT/src/lib/log.sh"
+source "$PTT_ROOT/src/lib/ui.sh"
 
 # Swapping the speech engine should mean rewriting this block and nothing else.
 BIN=nerd-dictation
@@ -110,14 +111,26 @@ cmd_end() {
     "$BIN" end
 }
 
-case "${1:-}" in
+CMD=''
+for a in "$@"; do
+    case "$a" in
+        -h | --help)
+            usage ptt
+            exit 0
+            ;;
+        -s | --step) export PTT_STEP=1 ;;
+        begin | end | install | uninstall)
+            if [[ -n $CMD ]]; then bad_arg ptt "$a"; fi
+            CMD="$a"
+            ;;
+        *) bad_arg ptt "$a" ;;
+    esac
+done
+
+case "$CMD" in
     begin) cmd_begin ;;
     end) cmd_end ;;
     install) exec "$PTT_ROOT/src/ptt-install" install ;;
     uninstall) exec "$PTT_ROOT/src/ptt-install" uninstall ;;
-    *)
-        log_error "unknown command: ${1:-}"
-        printf 'usage: ptt [begin|end|install|uninstall]\n' >&2
-        exit 1
-        ;;
+    *) usage ptt ;;
 esac

@@ -1,0 +1,19 @@
+ptt-install - install or remove the ptt voice typing stack
+
+usage: ptt-install [command] [options]
+
+commands:
+  install      install the stack, or reconfigure it (the default)
+  uninstall    remove the packages, the model, and the symlinks
+
+options:
+  -s, --step   show each command and confirm it before it runs
+  -h, --help   show this help
+
+examples:
+  ptt-install
+  ptt-install install --step
+  ptt-install uninstall
+
+The run shows a plan and asks once before it starts. With --step it also shows
+each command and asks before running it.

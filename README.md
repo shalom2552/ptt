@@ -40,8 +40,15 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-The installer shows a plan, asks before every command it runs, and lets you pick
-a speech model. Re-running it gives a small menu instead of reinstalling.
+The installer shows a plan, asks once, then announces each command as it runs.
+It lets you pick a speech model. Re-running it gives a small menu instead of
+reinstalling.
+
+Pass `--step` to see each command and confirm it before it runs:
+
+```
+~/.local/share/ptt/ptt install --step
+```
 
 ## Bind a key
 
@@ -61,7 +68,10 @@ ptt begin        start dictating
 ptt end          stop, text is typed
 ptt install      install, or reconfigure
 ptt uninstall    remove packages, model, and symlinks
+
+-s, --step       show each command and confirm it before it runs
+-h, --help       show the help
 ```
 
 You normally only run `install` and `uninstall` by hand. `begin` and `end` are
-what the keybind calls.
+what the keybind calls. A bare `ptt` prints the help.

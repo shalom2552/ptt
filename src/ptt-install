@@ -87,7 +87,7 @@ print_plan() {
         plan_line "$((++n))" "offer to add you to the $(arg input) group for live text"
     fi
     printf '\n'
-    plan_note "Every command is shown for confirmation before it runs."
+    plan_step_note
     plan_note "pacman and yay ask for your password themselves."
 }
 
@@ -107,10 +107,10 @@ choose_model() {
 
 install_model() {
     local i="$1"
-    step "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
+    run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
         yay -S --needed "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
-    step "point nerd-dictation at that model" \
+    run_or_stop "point nerd-dictation at that model" \
         ln -sfn "$MODEL_ROOT/${MODEL_DIRS[i]}" "$MODEL_LINK"
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at ${MODEL_LINK/#$HOME/\~}"
 }
@@ -120,7 +120,7 @@ offer_group() {
     printf '\nJoin for live text that appears as you speak.\n'
     printf 'Decline for deferred mode, where the whole utterance\n'
     printf 'appears when you release the key.\n'
-    run_cmd "add you to the input group, needs a logout to apply" \
+    ask_cmd "add you to the input group, needs a logout to apply" \
         sudo gpasswd -a "$USER_NAME" input
 }
 
@@ -165,16 +165,16 @@ first_run() {
         return 0
     fi
 
-    step "install ${REPO_PKGS[*]} from pacman, types the text" \
+    run_or_stop "install ${REPO_PKGS[*]} from pacman, types the text" \
         sudo pacman -S --needed "${REPO_PKGS[@]}"
-    step "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
+    run_or_stop "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
         yay -S --needed "${AUR_PKGS[@]}"
 
     choose_model
     install_model "$PICK"
 
     mkdir -p "$(dirname "$BIN_LINK")"
-    step "put ptt on your PATH for terminal use" \
+    run_or_stop "put ptt on your PATH for terminal use" \
         ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
 
     local group_added=0
@@ -278,7 +278,7 @@ cmd_uninstall() {
     fi
     printf '\n'
     plan_note "$(printf '%s is left in place.' "${PTT_ROOT/#$HOME/\~}")"
-    plan_note "Every command is shown for confirmation before it runs."
+    plan_step_note
     if ! confirm "Proceed?"; then
         log_info "Nothing done."
         return 0
@@ -294,7 +294,7 @@ cmd_uninstall() {
     if ((do_link)); then
         run_cmd "take ptt off your PATH" rm -f "$BIN_LINK" || true
     fi
-    if ((do_group)) && run_cmd "drop you from the input group" \
+    if ((do_group)) && ask_cmd "drop you from the input group" \
         sudo gpasswd -d "$USER_NAME" input; then
         log_warn "The input group is gone from the database."
         log_warn "Log out and back in fully before it is gone for this session."
@@ -303,14 +303,25 @@ cmd_uninstall() {
 }
 
 main() {
-    case "${1:-install}" in
+    local a cmd=''
+    for a in "$@"; do
+        case "$a" in
+            -h | --help)
+                usage ptt-install
+                return 0
+                ;;
+            -s | --step) PTT_STEP=1 ;;
+            install | uninstall)
+                if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
+                cmd="$a"
+                ;;
+            *) bad_arg ptt-install "$a" ;;
+        esac
+    done
+
+    case "${cmd:-install}" in
         install) cmd_install ;;
         uninstall) cmd_uninstall ;;
-        *)
-            log_error "unknown command: $1"
-            printf 'usage: ptt-install [install|uninstall]\n' >&2
-            exit 1
-            ;;
     esac
 }
 
