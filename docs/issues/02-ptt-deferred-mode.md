@@ -57,8 +57,8 @@ This slice runs deferred only, so `begin` also passes `--defer-output` and spawn
 nothing. Without it, wtype types during the hold, Hyprland loses the key release,
 and dictation never stops. Mode selection and the watcher arrive in ticket 03.
 
-Repoint the Hyprland binds in `~/.config/hypr/modules/machine.lua` at the new
-path by full path, and add the release bind that the prototype is missing:
+Repoint the Hyprland binds at the new path by full path, and add the release
+bind that the prototype is missing:
 
 ```lua
 hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
@@ -99,4 +99,4 @@ the backstop this ticket assumes.
 - [ ] With `nerd-dictation` off PATH, both begin and end fire the not-installed notification
 - [x] Checked whether `--delay-exit=0.2` clips the last word on the linked model; recorded the finding either way
 - [x] `set -Eeuo pipefail` and an `ERR` trap, per `docs/conventions.md`
-- [x] Both binds present in `machine.lua` by full path, `hyprctl reload` applied, nothing staged or committed in the hypr repo
+- [x] Both binds present in the Hyprland config by full path, `hyprctl reload` applied, nothing staged or committed in the hypr repo

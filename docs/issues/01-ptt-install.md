@@ -78,7 +78,7 @@ Only what applies to the situation it found. Silence when there is nothing to do
   two lines ready to paste, and where to paste them:
 
   ```
-  No keybind found. Add to ~/.config/hypr/modules/machine.lua:
+  No keybind found. Add to your Hyprland config:
 
     hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
     hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })

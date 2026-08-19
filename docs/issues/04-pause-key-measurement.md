@@ -10,7 +10,7 @@ check whether the release event lands on the physical release or immediately.
 Hold F12 the same way as a control, so the method is known good.
 
 If Pause passes, change `KEY` and `KEYCODE` in `ptt`'s variable block to Pause
-and 119, and change both binds in `machine.lua` to match. That is the whole
+and 119, and change both binds in the Hyprland config to match. That is the whole
 switch, which is the point of the variable block. If Pause fails, F12 stays and
 this ticket closes with the measurement written down.
 
@@ -31,5 +31,5 @@ key can be swapped.
 - [ ] Pause held ~3s, release event timing observed on `/dev/input/event*` for code 119
 - [ ] F12 run as a control with the same method
 - [ ] Result written into this file, pass or fail
-- [ ] If pass: `KEY`/`KEYCODE` updated in `ptt`, both binds updated in `machine.lua`, hold to talk verified end to end on Pause
+- [ ] If pass: `KEY`/`KEYCODE` updated in `ptt`, both binds updated in the Hyprland config, hold to talk verified end to end on Pause
 - [ ] If fail: F12 stays, no code changed

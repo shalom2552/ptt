@@ -19,7 +19,7 @@ ARGS=(
     --timeout 30
 )
 PKGS=(wtype nerd-dictation-git)
-# Must match the Hyprland bind in ~/.config/hypr/modules/machine.lua.
+# Must match the Hyprland bind.
 KEY=F12
 KEYCODE=88
 
