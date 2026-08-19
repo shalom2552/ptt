@@ -83,10 +83,9 @@ plan_note() { printf '%s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
 
 plan_step_note() {
     if ((PTT_STEP)); then
-        plan_note "Each command is shown for confirmation before it runs."
+        plan_note "Each step is confirmed before it runs."
     else
-        plan_note "Each command is shown as it runs."
-        plan_note "--step confirms each one first."
+        plan_note "tip: run with --step to confirm each step."
     fi
 }
 
