@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# ptt - entry point. The keybind and the PATH link point here, the work lives
-# under src/.
+# ptt - entry point. The keybind and the PATH link point here.
 set -Eeuo pipefail
 
 PTT_ROOT="$(dirname "$(readlink -f "$0")")"
+source "$PTT_ROOT/src/lib/log.sh"
+
+trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 exec "$PTT_ROOT/src/ptt" "$@"

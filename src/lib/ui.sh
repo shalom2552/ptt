@@ -1,5 +1,5 @@
-# ui.sh - headings, prompts, and plan output. Sourced after log.sh, which it
-# uses to report a skipped command and a bad menu answer.
+# ui.sh - headings, prompts, and plan output. Uses the colors and log
+# functions from log.sh, which has to be sourced first.
 
 rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
 
