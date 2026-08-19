@@ -13,8 +13,7 @@ MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
 USER_NAME="${USER:-$(id -un)}"
 
-# Completions, one column per shell. The link's directory belongs to the shell,
-# so a shell that is not installed has no directory and is skipped.
+# One column per shell. A shell that is not installed has no link directory.
 COMP_SHELLS=(zsh bash)
 COMP_LINKS=(/usr/share/zsh/site-functions/_ptt /usr/share/bash-completion/completions/ptt)
 COMP_SRCS=("$PTT_ROOT/share/completions/ptt.zsh" "$PTT_ROOT/share/completions/ptt.bash")
@@ -43,24 +42,14 @@ group_in_db() {
 # What this session actually has. Only set at login, so it can lag the database.
 group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
 
-mode_desc() {
-    if group_in_session; then
-        echo "live"
-    else
-        echo "deferred"
-    fi
-}
-
-mode_effect() {
-    if group_in_session; then
-        echo "text appears while speaking"
-    else
-        echo "the utterance appears on key release"
-    fi
-}
-
 is_installed() {
     command -v nerd-dictation &>/dev/null && [[ -L $MODEL_LINK ]]
+}
+
+current_model_dir() {
+    local target
+    target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
+    basename "$target"
 }
 
 model_index_for_dir() {
@@ -72,6 +61,13 @@ model_index_for_dir() {
         fi
     done
     return 1
+}
+
+installed_model_pkgs() {
+    local pkg
+    for pkg in "${MODEL_PKGS[@]}"; do
+        if pkg_installed "$pkg"; then printf '%s\n' "$pkg"; fi
+    done
 }
 
 # True when the link is there and points at this copy of the repo.
@@ -96,8 +92,7 @@ link_completions() {
     fi
 }
 
-# Links this copy should own and does not: left behind by a move, or never
-# made because the install predates them.
+# Links this copy should own and does not, after a move or an older install.
 offer_links() {
     local -a todo=()
     local i
@@ -144,34 +139,6 @@ offer_links() {
     fi
 }
 
-current_model_dir() {
-    local target
-    target="$(readlink "$MODEL_LINK" 2>/dev/null)" || return 1
-    basename "$target"
-}
-
-print_plan() {
-    local n=0
-    plan_title "ptt install will:"
-    plan_line "$((++n))" "install $(arg "${REPO_PKGS[*]}") from the official repos"
-    plan_line "$((++n))" "install $(arg "${AUR_PKGS[*]}") from the AUR"
-    plan_line "$((++n))" "install a vosk model, picked from a menu"
-    plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
-    plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
-    local i
-    for i in "${!COMP_SHELLS[@]}"; do
-        if [[ -d $(comp_dir "$i") ]]; then
-            plan_line "$((++n))" \
-                "link the ${COMP_SHELLS[i]} completion into $(arg "$(comp_dir "$i")")"
-        fi
-    done
-    if ! group_in_db; then
-        plan_line "$((++n))" "offer to join the $(arg input) group for live text"
-    fi
-    printf '\n'
-    plan_step_note
-}
-
 choose_model() {
     local i label
     heading "Choose a model" >&2
@@ -209,6 +176,57 @@ offer_group() {
         sudo gpasswd -a "$USER_NAME" input
 }
 
+mode_desc() {
+    if group_in_session; then
+        echo "live"
+    else
+        echo "deferred"
+    fi
+}
+
+mode_effect() {
+    if group_in_session; then
+        echo "text appears while speaking"
+    else
+        echo "the utterance appears on key release"
+    fi
+}
+
+print_mode() {
+    local group_added="${1:-0}"
+    field mode "$(mode_desc)" "$(mode_effect)"
+    if ((group_added)); then
+        printf '\n'
+        note "Log out and back in for the input group to apply."
+    elif group_in_db && ! group_in_session; then
+        printf '\n'
+        note "This session predates the input group membership."
+        note "Log out and back in for live text."
+    fi
+}
+
+print_plan() {
+    local n=0
+    plan_title "ptt install will:"
+    plan_line "$((++n))" "install $(arg "${REPO_PKGS[*]}") from the official repos"
+    plan_line "$((++n))" "install $(arg "${AUR_PKGS[*]}") from the AUR"
+    plan_line "$((++n))" "install a vosk model, picked from a menu"
+    plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
+    plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
+    local i
+    for i in "${!COMP_SHELLS[@]}"; do
+        if [[ -d $(comp_dir "$i") ]]; then
+            plan_line "$((++n))" \
+                "link the ${COMP_SHELLS[i]} completion into $(arg "$(comp_dir "$i")")"
+        fi
+    done
+    if ! group_in_db; then
+        plan_line "$((++n))" "offer to join the $(arg input) group for live text"
+    fi
+    printf '\n'
+    plan_step_note
+}
+
 print_bind_help() {
     if [[ ! -d $HYPR_DIR ]]; then
         log_info "ptt is installed and runs from a terminal."
@@ -225,19 +243,6 @@ No keybind found. Add to the Hyprland config:
 
 Then: hyprctl reload
 EOF
-}
-
-print_mode() {
-    local group_added="${1:-0}"
-    field mode "$(mode_desc)" "$(mode_effect)"
-    if ((group_added)); then
-        printf '\n'
-        note "Log out and back in for the input group to apply."
-    elif group_in_db && ! group_in_session; then
-        printf '\n'
-        note "This session predates the input group membership."
-        note "Log out and back in for live text."
-    fi
 }
 
 first_run() {
@@ -326,13 +331,6 @@ menu_installed() {
     printf '\n'
     prompt_index "${#labels[@]}" "Choice" "$((${#labels[@]} - 1))"
     "${actions[PICK]}"
-}
-
-installed_model_pkgs() {
-    local pkg
-    for pkg in "${MODEL_PKGS[@]}"; do
-        if pkg_installed "$pkg"; then printf '%s\n' "$pkg"; fi
-    done
 }
 
 cmd_install() {
