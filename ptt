@@ -14,6 +14,7 @@ ARGS=(
     --full-sentence
     # Hang backstop: exits on its own after 30s with no speech processed.
     --timeout 30
+    --config "$DIR/ptt-config.py"
 )
 # Deferred mode only. Without it wtype types during the hold, Hyprland loses
 # the key release, and dictation never stops. The watcher reads the release
@@ -92,7 +93,7 @@ cmd_begin() {
         args+=("${DEFER_ARGS[@]}")
     fi
     notify_state 30000 listening
-    "$BIN" begin "${args[@]}"
+    setsid -f "$BIN" begin "${args[@]}" # detached, caller returns at once
 }
 
 cmd_end() {
