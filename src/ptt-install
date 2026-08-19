@@ -27,6 +27,7 @@ MODEL_PKGS=(vosk-model-small-en-us vosk-model-en-us-lgraph vosk-model-en-us)
 MODEL_DIRS=(small-en-us en-us-lgraph en-us)
 MODEL_VERS=(0.15 0.22 0.22)
 MODEL_SIZES=("~40 MB" "~128 MB" "~1.8 GB")
+MODEL_LABELS=("fastest" "more accurate" "best, heavy")
 DEFAULT_MODEL=0
 
 # -E propagates this into functions, so nothing fails silently.
@@ -172,15 +173,20 @@ print_plan() {
 }
 
 choose_model() {
-    local i
+    local i label
     heading "Choose a model" >&2
     printf '\n' >&2
     for i in "${!MODEL_PKGS[@]}"; do
-        printf '  %d) %-24s %-5s %s%s\n' \
+        label="$C_DIM${MODEL_LABELS[i]}"
+        if ((i == DEFAULT_MODEL)); then
+            label+=", $C_RESET${C_ARG}default"
+        fi
+        printf '  %d) %-24s %-5s %-8s %s%s\n' \
             "$((i + 1))" "${MODEL_PKGS[i]}" "${MODEL_VERS[i]}" "${MODEL_SIZES[i]}" \
-            "$([[ $i -eq $DEFAULT_MODEL ]] && echo '  (default)')" >&2
+            "$label" "$C_RESET" >&2
         printf '     %s%s%s\n\n' "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET" >&2
     done
+    note "Speed is CPU bound. The big model lags on modest hardware." >&2
     printf '\n' >&2
     prompt_index "${#MODEL_PKGS[@]}" "Model" "$DEFAULT_MODEL" >&2
 }
@@ -264,7 +270,8 @@ first_run() {
     heading "ptt installed"
     printf '\n'
     field packages "${REPO_PKGS[*]} ${AUR_PKGS[*]}"
-    field model "${MODEL_DIRS[model_idx]} (${MODEL_VERS[model_idx]})"
+    field model "${MODEL_DIRS[model_idx]} (${MODEL_VERS[model_idx]})" \
+        "${MODEL_LABELS[model_idx]}"
     field ptt "${BIN_LINK/#$HOME/\~}"
     print_mode "$group_added"
     printf '\n'
@@ -273,8 +280,13 @@ first_run() {
 
 action_change_model() {
     choose_model
-    install_model "$PICK"
+    local i="$PICK"
+    install_model "$i"
+
+    heading "ptt model set"
     printf '\n'
+    field model "${MODEL_DIRS[i]} (${MODEL_VERS[i]})" "${MODEL_LABELS[i]}"
+    field link "${MODEL_LINK/#$HOME/\~}"
     print_mode 0
 }
 
@@ -286,10 +298,11 @@ action_join_group() {
 }
 
 menu_installed() {
-    local dir ver idx
+    local dir ver idx label=''
     dir="$(current_model_dir)" || dir='unknown'
     if idx="$(model_index_for_dir "$dir")"; then
         ver="${MODEL_VERS[idx]}"
+        label="${MODEL_LABELS[idx]}"
     else
         ver='unknown'
     fi
@@ -303,7 +316,7 @@ menu_installed() {
 
     heading "ptt is installed"
     printf '\n'
-    field model "$dir ($ver)"
+    field model "$dir ($ver)" "$label"
     print_mode 0
     printf '\n'
     local i
