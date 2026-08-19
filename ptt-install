@@ -216,7 +216,7 @@ print_bind_help() {
     local p="${PTT_DIR/#$HOME/\~}/ptt"
     cat <<EOF
 
-No keybind found. Add to ~/.config/hypr/modules/machine.lua:
+No keybind found. Add to your Hyprland config:
 
   hl.bind("F12", hl.dsp.exec_cmd("$p begin"))
   hl.bind("F12", hl.dsp.exec_cmd("$p end"), { release = true })
