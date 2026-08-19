@@ -16,12 +16,26 @@ Comments say what the code does, never what changed or why a choice was made.
 No `see docs/X.md` pointers. Load bearing behaviour only. Strip comments from
 any block copied out of another file.
 
+## Layout
+
+```
+ptt                 shim, execs src/ptt
+src/                dictation, installer, key watcher, nerd-dictation config
+src/lib/            log.sh and ui.sh, sourced by the scripts
+share/help/         help text
+share/completions/  shell completions
+```
+
+Every script sets `PTT_ROOT` from its own location and builds its paths from
+there, so a clone works at any path. Nothing hardcodes a repo path.
+
 ## Code
 
 Strict YAGNI. Only what was asked, no unsolicited features or boilerplate.
 
-`ptt` and `ptt-install` share one `log_info` / `log_warn` / `log_error` block.
-Copy it, do not invent a second style. Every terminal line carries a level.
+Colors and `log_info` / `log_warn` / `log_error` live in `src/lib/log.sh`.
+Headings, prompts, and plan output live in `src/lib/ui.sh`. Source them, do not
+copy them and do not invent a second style. Every terminal line carries a level.
 
 ## Testing
 
