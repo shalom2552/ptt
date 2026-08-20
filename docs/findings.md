@@ -40,11 +40,19 @@ against the installed file, not against r156.
 
 ## The cookie file is the whole session state
 
-Three things `ptt` reads off a session's `--cookie`, none of them documented.
+Four things ride on a session's `--cookie`, none of them documented.
 Lines are `/usr/bin/nerd-dictation`.
 
 - mtime 0 means listening, anything else means over (1329).
+- Its content is the engine pid, written at `begin` (1325) and read back at
+  `end`, which signals that pid (1477, 1514).
 - Removing a live cookie cancels the session and drops its text (1347), so
   cookies pile up in `$XDG_RUNTIME_DIR` until logout.
 - Its age at `begin` is the `--punctuate-from-previous-timeout` window (1317),
   so `begin` carries the previous cookie's mtime forward.
+
+## mtime 0 alone is not liveness
+
+A crashed engine never stamps its cookie, so the session reads as live forever.
+Liveness is mtime 0 and `kill -0` on the pid in the cookie, anything else is
+over.
