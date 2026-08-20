@@ -1,8 +1,5 @@
 # Behavior
 
-How the engine and the system under it behave, checked against the running
-machine.
-
 ## `--delay-exit` and `--timeout` cannot both apply
 
 Upstream gates one behind the other, `/usr/bin/nerd-dictation:1340`:
@@ -11,17 +8,13 @@ Upstream gates one behind the other, `/usr/bin/nerd-dictation:1340`:
 use_overtime = delay_exit > 0.0 and timeout == 0.0
 ```
 
-`use_overtime` is the only thing that reads `delay_exit`. With `--timeout 30`
-set, `--delay-exit` is never applied, so passing it says something the run does
-not do.
+`use_overtime` is the only thing that reads `delay_exit`. ptt passes
+`--timeout 30` (`src/ptt:18`), so `--delay-exit` would never apply.
 
-Kept `--timeout 30`, dropped `--delay-exit`. The hang backstop protects against
-a lost key release leaving the microphone open, which is worse than a clipped
-last word.
-
-Whether 0.2 actually clips the last word on the linked `small-en-us` model is
-still untested. It needs someone at the microphone. If clipping shows up, the
-trade reverses: drop `--timeout` and put `--delay-exit=0.2` back.
+`--timeout 30` is a hang backstop: a lost key release leaving the microphone
+open is worse than a clipped last word. Whether the last word is clipped at all
+on the linked `small-en-us` model is still untested. If clipping shows up, the
+trade reverses: drop `--timeout` and pass `--delay-exit=0.2`.
 
 ## `--timeout 30` may not be the backstop it reads as
 
@@ -40,7 +33,7 @@ the installed file, not against r156.
 
 ## The cookie file is the whole session state
 
-Four things ride on a session's `--cookie`, none of them documented.
+Four things ride on a session's `--cookie`.
 Lines are `/usr/bin/nerd-dictation`.
 
 - mtime 0 means listening, anything else means over (1329).
@@ -66,25 +59,11 @@ Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
 ## The compositor release survives live typing
 
 The release bind ends every session. Live typing during the hold does not eat
-it. The old watcher never fired either way: it waited on keycode 88, `KEY_F12`
-(`/usr/include/linux/input-event-codes.h:164`), and the bind is `Pause`,
-`KEY_PAUSE` 119 (`:195`).
+it.
 
-## `--defer-output` switches the typing path
+## `WTYPE` is a process per call
 
-It sets `progressive` off (1850). On, the engine types deltas (1050). Off, one
-call at exit (1264). ptt never passes it, so output is always progressive.
-
-## The input tools differ in how long their device lives
-
-- `WTYPE`, a process per call (279). New keymap each time, `-d` defaults to 0.
-  A window that binds asynchronously loses the delta's leading space.
-- `DOTOOL`, one process setup to teardown (223), `typedelay 12`. Command written
-  unescaped into a newline delimited stream (255), so `new line` breaks.
-- `YDOTOOL`, a process per call (199), raw keycodes.
-
-## `/dev/uinput` is `root:input 0660`
-
-`DOTOOL`, `DOTOOLC`, and `YDOTOOL` all need the `input` group. Only `WTYPE`
-types without it, and `WTYPE` is what ptt passes. Engine tool list at
-`/usr/bin/nerd-dictation:1802`.
+A new process and a new keymap on every call (279), `-d` defaults to 0. A
+window that binds asynchronously loses the delta's leading space. Output is
+always progressive, deltas as they are recognized (1050): only `--defer-output`
+turns that off (1850) and ptt never passes it.
