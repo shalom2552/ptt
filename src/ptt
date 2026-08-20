@@ -71,6 +71,7 @@ end_session() {
     # A late end of a superseded session must not talk over the live one.
     [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && say_state 1000 done
     "$BIN" end --cookie "$cookie"
+    rm -f "$cookie.stop" "$cookie.lock"
 }
 
 cmd_begin() {
