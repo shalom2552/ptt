@@ -56,3 +56,22 @@ Lines are `/usr/bin/nerd-dictation`.
 A crashed engine never stamps its cookie, so the session reads as live forever.
 Liveness is mtime 0 and `kill -0` on the pid in the cookie, anything else is
 over.
+
+## The cookie age adds a leading mark, by design
+
+Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
+`--full-sentence` (1400). Age is the only input. Lands after the user config
+(1398), so `ptt-config.py` cannot strip it.
+
+## `--defer-output` switches the typing path
+
+It sets `progressive` off (1850). On, the engine types deltas (1050). Off, one
+call at exit (1264).
+
+## The input tools differ in how long their device lives
+
+- `WTYPE`, a process per call (279). New keymap each time, `-d` defaults to 0.
+  A window that binds asynchronously loses the delta's leading space.
+- `DOTOOL`, one process setup to teardown (223), `typedelay 12`. Command written
+  unescaped into a newline delimited stream (255), so `new line` breaks.
+- `YDOTOOL`, a process per call (199), raw keycodes.
