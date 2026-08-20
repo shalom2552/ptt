@@ -53,11 +53,6 @@ Lines are `/usr/bin/nerd-dictation`.
 
 ## mtime 0 alone is not liveness
 
-An engine that crashes never stamps its cookie, so the cookie sits at mtime 0
-with nobody behind it and the session reads as live forever. `begin` refuses,
-`end` calls the engine on a dead pid and gets a `ProcessLookupError` traceback,
-and only deleting `$XDG_RUNTIME_DIR/ptt.session` clears it.
-
-mtime 0 says the engine did not stamp the cookie, not that the engine is there.
-The pid in the cookie settles it: mtime 0 and `kill -0` on that pid is live,
-anything else is over.
+A crashed engine never stamps its cookie, so the session reads as live forever.
+Liveness is mtime 0 and `kill -0` on the pid in the cookie, anything else is
+over.
