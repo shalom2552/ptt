@@ -19,10 +19,6 @@ ARGS=(
     --config "$PTT_ROOT/src/ptt-config.py"
 )
 
-RUN="${XDG_RUNTIME_DIR:-/tmp}"
-SESSION="$RUN/ptt.session" # cookie path of the last begin
-LOG="$RUN/ptt.log" # output of the detached engine
-
 # One tray slot, so a notice replaces the last instead of stacking.
 notify() {
     local urgency=$1 timeout=$2 title=$3 body=$4
@@ -41,6 +37,17 @@ say_state() {
 # Off a key press there is no terminal, so failures also go to the screen.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
       notify_warn "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
+
+# Every runtime file is per session. No session directory, no run.
+if [[ -z ${XDG_RUNTIME_DIR:-} ]]; then
+    log_error "XDG_RUNTIME_DIR is not set"
+    notify_warn "ptt cannot run" "XDG_RUNTIME_DIR is not set."
+    exit 1
+fi
+
+RUN="$XDG_RUNTIME_DIR"
+SESSION="$RUN/ptt.session" # cookie path of the last begin
+LOG="$RUN/ptt.log" # output of the detached engine
 
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
