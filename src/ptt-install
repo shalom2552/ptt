@@ -300,6 +300,7 @@ uninstall_todo() {
     for i in "${!COMP_SHELLS[@]}"; do
         [[ -L ${COMP_LINKS[i]} ]] && RM_TODO+=("comp$i")
     done
+    : # a false last test must not return 1 into set -e
 }
 
 uninstall_plan() {
