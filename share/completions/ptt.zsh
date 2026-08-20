@@ -1,22 +1,15 @@
-#compdef ptt ptt-install
+#compdef ptt
 
 local state
 local -a commands spec
 local step='[show each command and confirm it before it runs]'
 
-if [[ $service == ptt ]]; then
-    commands=(
-        'begin:start dictating'
-        'end:stop dictating'
-        'install:install the stack, or reconfigure it'
-        'uninstall:remove the packages, model, and symlinks'
-    )
-else
-    commands=(
-        'install:install the stack, or reconfigure it'
-        'uninstall:remove the packages, model, and symlinks'
-    )
-fi
+commands=(
+    'begin:start dictating'
+    'end:stop dictating'
+    'install:install the stack, or reconfigure it'
+    'uninstall:remove the packages, model, and symlinks'
+)
 
 spec=(
     '(-h --help)'{-h,--help}'[show this help]'

@@ -428,7 +428,7 @@ main() {
     for a in "$@"; do
         case "$a" in
             -h | --help)
-                usage ptt-install
+                usage ptt
                 return 0
                 ;;
             -s | --step) export PTT_STEP=1 ;;
@@ -437,10 +437,10 @@ main() {
                 model_arg="$a"
                 ;;
             install | uninstall)
-                if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
+                if [[ -n $cmd ]]; then bad_arg ptt "$a"; fi
                 cmd="$a"
                 ;;
-            *) bad_arg ptt-install "$a" ;;
+            *) bad_arg ptt "$a" ;;
         esac
     done
 
@@ -449,7 +449,7 @@ main() {
             if ((model)); then cmd_model; else cmd_install; fi
             ;;
         uninstall)
-            if ((model)); then bad_arg ptt-install "$model_arg"; fi
+            if ((model)); then bad_arg ptt "$model_arg"; fi
             cmd_uninstall
             ;;
     esac
