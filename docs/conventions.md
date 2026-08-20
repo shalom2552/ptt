@@ -5,7 +5,7 @@ How the tools behave. Beats any ticket that says otherwise.
 ## Voice
 
 Man page style: imperative, impersonal, terse.
-Name the thing, not the person: "leave the input group", not "drop you from it".
+Name the thing, not the person: "unlink ptt from PATH", not "unlink your ptt".
 
 ## Output
 
@@ -39,10 +39,8 @@ Print only what applies. Nothing about a thing that is not there.
 1. Numbered plain English plan, no commands, then one `Proceed? [n/Y]`.
 2. Each command announced on one line as it runs.
 
-Mechanics go quiet, choices always ask.
-A mechanic is a step the plan covered: a package install, a symlink.
-A choice costs what the run cannot undo, like the input group's logout.
-A choice shows its command and asks in both modes.
+Mechanics go quiet. A mechanic is a step the plan covered: a package install,
+a symlink.
 
 `-s` / `--step` confirms the mechanics too, so nothing runs unseen:
 

@@ -18,10 +18,6 @@ ARGS=(
     --timeout 30
     --config "$PTT_ROOT/src/ptt-config.py"
 )
-# Typing during the hold can eat the key release. Live mode has the watcher.
-DEFER_ARGS=(--defer-output)
-PKGS=(wtype nerd-dictation-git)
-KEYCODE=88 # must match the keybind
 
 RUN="${XDG_RUNTIME_DIR:-/tmp}"
 SESSION="$RUN/ptt.session" # cookie path of the last begin
@@ -55,15 +51,6 @@ require_engine() {
     fi
 }
 
-# Tests the device, not the group: a fresh gpasswd needs a login to take.
-can_watch() {
-    local dev
-    for dev in /dev/input/event*; do
-        [[ -r $dev ]] && return 0
-    done
-    return 1
-}
-
 # The engine holds its cookie at mtime 0 while listening, stamps it on end.
 # A crash leaves mtime 0 behind, so the pid in the cookie decides.
 session_live() {
@@ -77,24 +64,13 @@ session_live() {
 # Ends one named session, never whichever one happens to be up.
 end_session() {
     local cookie=$1
-    # Watcher and release bind both arrive. The loser must not end again.
+    # Release bind and a late begin both arrive. The loser must not end again.
     exec 9>"$cookie.lock"
     flock -n 9 || return 0
     session_live "$cookie" || return 0
     # A late end of a superseded session must not talk over the live one.
     [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && say_state 1000 done
     "$BIN" end --cookie "$cookie"
-}
-
-# Backgrounded by begin in live mode. Ends the session when the key comes up.
-watch_release() {
-    if "$PTT_ROOT/src/ptt-keywatch" "$KEYCODE"; then
-        end_session "$1"
-    else
-        local msg="key watcher failed, dictation stops on timeout"
-        log_warn "$msg"
-        notify_warn ptt "$msg"
-    fi
 }
 
 cmd_begin() {
@@ -113,15 +89,10 @@ cmd_begin() {
         touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
-    local -a args=("${ARGS[@]}" --cookie "$cookie")
-    if can_watch; then
-        watch_release "$cookie" &
-    else
-        args+=("${DEFER_ARGS[@]}")
-    fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
-    setsid -f "$BIN" begin "${args[@]}" >>"$LOG" 2>&1 # detached, outlives this process
+    # Detached, so the engine outlives this process.
+    setsid -f "$BIN" begin "${ARGS[@]}" --cookie "$cookie" >>"$LOG" 2>&1
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done

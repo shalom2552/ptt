@@ -18,6 +18,15 @@ What ptt adds is the setup and the glue: an installer that puts the packages,
 the model, and the symlinks in place, and a small script your compositor calls
 on key press and key release.
 
+## How it works
+
+- The keybind runs `ptt begin` on key press and `ptt end` on key release.
+- nerd-dictation records from the microphone and vosk turns it into text,
+  offline.
+- `src/ptt-config.py` attaches spoken punctuation to the word before it and
+  capitalizes after a sentence ends.
+- wtype types the words into the focused window as you speak.
+
 ## Features
 
 - Punctuation marks support.
@@ -25,14 +34,7 @@ on key press and key release.
 
 ## Status
 
-Works on Arch with Hyprland and Wayland. Nothing else yet. Widening it to the
-main distros is tracked in
-[issue #1](https://github.com/shalom2552/ptt/issues/1).
-
-Text appears as you speak if ptt can read your input devices, which needs the
-`input` group and a login since you joined it. Otherwise the whole utterance
-appears when you release the key. ptt picks the mode on every press, there is
-nothing to configure.
+Works on Arch with Hyprland and Wayland. Nothing else yet.
 
 ## Install
 

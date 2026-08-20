@@ -63,10 +63,18 @@ Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
 `--full-sentence` (1400). Age is the only input. Lands after the user config
 (1398), so `ptt-config.py` cannot strip it.
 
+## The compositor release survives live typing
+
+The dropped `ptt` watcher block claimed typing during the hold can eat the key
+release. It has not. `KEYCODE=88` was `KEY_F12`
+(`/usr/include/linux/input-event-codes.h:164`), the bind is `Pause`,
+`KEY_PAUSE` 119 (`:195`), so the watcher never fired and the release bind ended
+every live session on its own.
+
 ## `--defer-output` switches the typing path
 
 It sets `progressive` off (1850). On, the engine types deltas (1050). Off, one
-call at exit (1264).
+call at exit (1264). ptt never passes it, so output is always progressive.
 
 ## The input tools differ in how long their device lives
 
@@ -75,3 +83,8 @@ call at exit (1264).
 - `DOTOOL`, one process setup to teardown (223), `typedelay 12`. Command written
   unescaped into a newline delimited stream (255), so `new line` breaks.
 - `YDOTOOL`, a process per call (199), raw keycodes.
+
+## `/dev/uinput` is `root:input 0660`
+
+`DOTOOL`, `DOTOOLC`, and `YDOTOOL` all need the `input` group. Only `WTYPE`
+types without it. Engine tool list at `/usr/bin/nerd-dictation:1802`.
