@@ -39,8 +39,10 @@ Print only what applies. Nothing about a thing that is not there.
 1. Numbered plain English plan, no commands, then one `Proceed? [n/Y]`.
 2. Each command announced on one line as it runs.
 
-Mechanics go quiet. A mechanic is a step the plan covered: a package install,
-a symlink.
+Mechanics go quiet, choices always ask.
+A mechanic is a step the plan covered: a package install, a symlink.
+A choice costs what the run cannot undo, like the input group's logout.
+A choice shows its command and asks in both modes.
 
 `-s` / `--step` confirms the mechanics too, so nothing runs unseen:
 

@@ -33,6 +33,9 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 
 Moving the project dir breaks the links. Run install again to fix them.
 
+The `input` group is optional. It buys the backstop that ends a session when
+the compositor drops the key release.
+
 ## Bind a key
 
 Hyprland, press and release:

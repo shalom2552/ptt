@@ -81,6 +81,26 @@ end_session() {
     rm -f "$cookie.stop" "$cookie.lock"
 }
 
+# Backgrounded by begin. The compositor release bind is dropped often enough
+# that the key state is what ends a session, not the bind alone.
+watch_release() {
+    local cookie=$1 rc=0
+    "$PTT_ROOT/src/ptt-keywatch" "$cookie" || rc=$?
+    case $rc in
+        # The flag tells a held session from a released one at the next begin.
+        0)
+            : >"$cookie.stop"
+            end_session "$cookie"
+            ;;
+        2) ;; # the session ended without the watch
+        *)
+            local msg="key watcher failed, dictation stops on timeout"
+            log_warn "$msg"
+            notify_warn ptt "$msg"
+            ;;
+    esac
+}
+
 cmd_begin() {
     require_engine
     local prev='' cookie deadline
@@ -105,6 +125,7 @@ cmd_begin() {
         touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
+    watch_release "$cookie" & # armed before the engine, while the key is down
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
     : >"$LOG" # one session deep, so a failure is the one just seen

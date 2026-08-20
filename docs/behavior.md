@@ -56,10 +56,17 @@ Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
 `--full-sentence` (1400). Age is the only input. Lands after the user config
 (1398), so `ptt-config.py` cannot strip it.
 
-## The compositor release survives live typing
+## The compositor release bind gets dropped
 
-The release bind ends every session. Live typing during the hold does not eat
-it.
+Hyprland loses release binds, so `ptt end` never runs and the engine types on
+until the 30s timeout. Open reports, no published cause: hyprwm/Hyprland#3208,
+#8800, #9240, #7675. The cause here is unconfirmed.
+
+`src/ptt-keywatch` is the backstop. It snapshots the keys held at `begin` with
+`EVIOCGKEY`, then ends the session when one comes up, on the release event or
+on a state read, whichever lands first. The state read is what covers a release
+the compositor never delivers. Reading `/dev/input/event*` needs the `input`
+group, so without it there is no backstop.
 
 ## `WTYPE` is a process per call
 

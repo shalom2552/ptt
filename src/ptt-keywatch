@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+# ptt-keywatch - block until a key held at start comes up, then exit. Runs off
+# ptt begin with no terminal, so it prints nothing.
+#
+# 0 released, 1 no readable device, 2 the session ended without it.
+import fcntl
+import glob
+import os
+import select
+import struct
+import sys
+import time
+
+# struct input_event: two longs of timeval, then type, code, value.
+EVENT_FORMAT = "llHHi"
+EVENT_SIZE = struct.calcsize(EVENT_FORMAT)
+EV_KEY = 0x01
+RELEASE = 0
+
+KEY_MAX = 0x2FF
+STATE_SIZE = KEY_MAX // 8 + 1
+# EVIOCGKEY(STATE_SIZE): a read ioctl, group 'E', number 0x18.
+EVIOCGKEY = 0x80000000 | (STATE_SIZE << 16) | (ord("E") << 8) | 0x18
+
+TICK = 0.1
+
+
+def open_devices():
+    fds = []
+    for path in sorted(glob.glob("/dev/input/event*")):
+        try:
+            fds.append(os.open(path, os.O_RDONLY | os.O_NONBLOCK))
+        except OSError:
+            pass
+    return fds
+
+
+def keys_down(fd):
+    state = bytearray(STATE_SIZE)
+    try:
+        fcntl.ioctl(fd, EVIOCGKEY, state)
+    except OSError:
+        return None
+    return {c for c in range(KEY_MAX + 1) if state[c // 8] >> (c % 8) & 1}
+
+
+def snapshot(fds):
+    held = {}
+    for fd in fds:
+        down = keys_down(fd)
+        if down:
+            held[fd] = down
+        else:
+            os.close(fd)
+    return held
+
+
+def released(fd, keys):
+    try:
+        data = os.read(fd, EVENT_SIZE * 64)
+    except BlockingIOError:
+        return False
+    except OSError:
+        return None
+    # A short read means the device is gone.
+    if len(data) < EVENT_SIZE:
+        return None
+    for i in range(0, len(data) - EVENT_SIZE + 1, EVENT_SIZE):
+        _, _, etype, code, value = struct.unpack(
+            EVENT_FORMAT, data[i : i + EVENT_SIZE]
+        )
+        if etype == EV_KEY and value == RELEASE and code in keys:
+            return True
+    return False
+
+
+# A carried cookie is stamped already, so only one that went live counts.
+def session_over(cookie, live):
+    try:
+        stamped = os.stat(cookie).st_mtime != 0
+    except OSError:
+        return live, live
+    if not stamped:
+        return True, False
+    return live, live
+
+
+def watch(held, cookie):
+    live = False
+    tick = time.monotonic() + TICK
+    while held:
+        ready, _, _ = select.select(
+            list(held), [], [], max(0.0, tick - time.monotonic())
+        )
+        for fd in ready:
+            gone = released(fd, held[fd])
+            if gone:
+                return 0
+            if gone is None:
+                os.close(fd)
+                del held[fd]
+        # On the clock, or traffic from another device starves the state read.
+        if time.monotonic() < tick:
+            continue
+        tick += TICK
+        for fd in list(held):
+            down = keys_down(fd)
+            if down is None:
+                os.close(fd)
+                del held[fd]
+            elif held[fd] - down:
+                return 0
+        live, over = session_over(cookie, live)
+        if over:
+            return 2
+    return 1
+
+
+def main(argv):
+    if len(argv) != 2:
+        return 1
+    cookie = argv[1]
+
+    fds = open_devices()
+    if not fds:
+        return 1
+    held = snapshot(fds)
+    # Nothing down means the key came up before the watch started.
+    if not held:
+        return 0
+    try:
+        return watch(held, cookie)
+    finally:
+        for fd in held:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

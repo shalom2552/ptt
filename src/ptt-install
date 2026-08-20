@@ -15,6 +15,7 @@ BIN_LINK="$HOME/.local/bin/ptt"
 MODEL_LINK="$ND_CONFIG/model"
 MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
+USER_NAME="${USER:-$(id -un)}"
 
 # A shell that is not installed has no link directory.
 COMP_SHELLS=(zsh bash)
@@ -40,6 +41,12 @@ DEFAULT_MODEL=0
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 pkg_installed() { pacman -Qq "$1" &>/dev/null; }
+
+# The group database, not this session's credentials.
+group_in_db() {
+    getent group input 2>/dev/null |
+        cut -d: -f4 | tr ',' '\n' | grep -qx "$USER_NAME"
+}
 
 is_installed() {
     command -v "$ND_BIN" &>/dev/null && [[ -L $MODEL_LINK ]]
@@ -181,6 +188,15 @@ install_model() {
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at $link"
 }
 
+offer_group() {
+    heading "The release backstop needs the input group"
+    printf '\n'
+    note "Join to end dictation on a key release the compositor drops."
+    note "Decline and a dropped release runs to the 30s timeout."
+    ask_cmd "join the input group, applies after logout" \
+        sudo gpasswd -a "$USER_NAME" input
+}
+
 print_plan() {
     local n=0 i dir
     plan_title "ptt install will:"
@@ -196,6 +212,10 @@ print_plan() {
         plan_line "$((++n))" \
             "link the ${COMP_SHELLS[i]} completion into $(arg "$dir")"
     done
+    if ! group_in_db; then
+        plan_line "$((++n))" \
+            "offer to join the $(arg input) group for the release backstop"
+    fi
     printf '\n'
     plan_step_note
 }
@@ -245,6 +265,8 @@ first_run() {
         log_warn "${BIN_LINK/#$HOME/\~} is a real file, left as it is"
     fi
     link_completions
+
+    if ! group_in_db; then offer_group || true; fi
 
     heading "ptt installed"
     printf '\n'
@@ -312,6 +334,7 @@ uninstall_todo() {
     done
     [[ -n ${XDG_RUNTIME_DIR:-} ]] &&
         compgen -G "$XDG_RUNTIME_DIR/ptt.*" >/dev/null && RM_TODO+=(runtime)
+    if group_in_db; then RM_TODO+=(group); fi
     : # a false last test must not return 1 into set -e
 }
 
@@ -335,6 +358,7 @@ uninstall_plan() {
                 plan_line "$((++n))" \
                     "remove $(arg "$XDG_RUNTIME_DIR/ptt.*"), the session files"
                 ;;
+            group) plan_line "$((++n))" "leave the $(arg input) group" ;;
         esac
     done
     printf '\n'
@@ -366,6 +390,12 @@ uninstall_run() {
             runtime)
                 run_cmd "remove the cookies, locks, log, and session pointer" \
                     rm -f "$XDG_RUNTIME_DIR"/ptt.* || true
+                ;;
+            group)
+                ask_cmd "leave the input group" \
+                    sudo gpasswd -d "$USER_NAME" input || continue
+                log_info "The input group is dropped in the database."
+                log_info "Log out and back in to clear it from this session."
                 ;;
         esac
     done
