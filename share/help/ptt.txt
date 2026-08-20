@@ -9,7 +9,7 @@ commands:
   uninstall    remove the packages, model, and symlinks
 
 options:
-  -s, --step   show each command and confirm it before it runs
+  -s, --step   show each command and confirm it, install and uninstall
   -m, --model  change the speech model, install only
   -h, --help   show this help
 

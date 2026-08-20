@@ -2,6 +2,7 @@
 
 local state
 local -a commands spec
+local step='[show each command and confirm it before it runs]'
 
 if [[ $service == ptt ]]; then
     commands=(
@@ -19,12 +20,14 @@ fi
 
 spec=(
     '(-h --help)'{-h,--help}'[show this help]'
-    '(-s --step)'{-s,--step}'[show each command and confirm it before it runs]'
     '1: :->command'
 )
-# --model belongs to install alone.
+# --model belongs to install alone, --step to install and uninstall.
 if (( ${words[(I)install]} )); then
     spec+=('(-m --model)'{-m,--model}'[change the speech model]')
+fi
+if (( ${words[(I)install]} || ${words[(I)uninstall]} )); then
+    spec+=('(-s --step)'{-s,--step}"$step")
 fi
 
 _arguments -s "${spec[@]}"
