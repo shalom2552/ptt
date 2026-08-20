@@ -164,14 +164,16 @@ choose_model() {
         printf '     %s%s%s\n\n' \
             "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET"
     done
-    note "Speed is CPU bound. The big model lags on modest hardware."
+    note "Sizes are downloads. Speed is CPU bound."
+    note "The big model lags on modest hardware."
     printf '\n'
     prompt_index "${#MODEL_PKGS[@]}" "Model" "$DEFAULT_MODEL"
 }
 
 install_model() {
     local i="$1" link="${MODEL_LINK/#$HOME/\~}"
-    run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
+    run_or_stop \
+        "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]} download" \
         yay -S --needed --noconfirm "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
     run_or_stop "point $ND_BIN at that model" \
