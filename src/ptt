@@ -167,7 +167,7 @@ case "$CMD" in
     install)
         FLAGS=()
         if ((MODEL)); then FLAGS=(--model); fi
-        exec "$PTT_ROOT/src/ptt-install" install "${FLAGS[@]}"
+        exec "$PTT_ROOT/src/ptt-install" install ${FLAGS[@]+"${FLAGS[@]}"}
         ;;
     uninstall) exec "$PTT_ROOT/src/ptt-install" uninstall ;;
     *) usage ptt ;;
