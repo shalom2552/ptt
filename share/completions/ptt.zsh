@@ -6,7 +6,7 @@ local -a commands spec
 if [[ $service == ptt ]]; then
     commands=(
         'begin:start dictating'
-        'end:stop dictating and type the text'
+        'end:stop dictating'
         'install:install the stack, or reconfigure it'
         'uninstall:remove the packages, model, and symlinks'
     )

@@ -65,11 +65,10 @@ Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
 
 ## The compositor release survives live typing
 
-The dropped `ptt` watcher block claimed typing during the hold can eat the key
-release. It has not. `KEYCODE=88` was `KEY_F12`
-(`/usr/include/linux/input-event-codes.h:164`), the bind is `Pause`,
-`KEY_PAUSE` 119 (`:195`), so the watcher never fired and the release bind ended
-every live session on its own.
+The release bind ends every session. Live typing during the hold does not eat
+it. The old watcher never fired either way: it waited on keycode 88, `KEY_F12`
+(`/usr/include/linux/input-event-codes.h:164`), and the bind is `Pause`,
+`KEY_PAUSE` 119 (`:195`).
 
 ## `--defer-output` switches the typing path
 
@@ -87,4 +86,5 @@ call at exit (1264). ptt never passes it, so output is always progressive.
 ## `/dev/uinput` is `root:input 0660`
 
 `DOTOOL`, `DOTOOLC`, and `YDOTOOL` all need the `input` group. Only `WTYPE`
-types without it. Engine tool list at `/usr/bin/nerd-dictation:1802`.
+types without it, and `WTYPE` is what ptt passes. Engine tool list at
+`/usr/bin/nerd-dictation:1802`.

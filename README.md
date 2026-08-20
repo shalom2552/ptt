@@ -1,7 +1,7 @@
 # ptt
 
-Push to talk voice typing on Linux. Hold a key, speak, release, and the text is
-typed into whatever window has focus.
+Push to talk voice typing on Linux. Hold a key and speak, and the words are
+typed into whatever window has focus as they are recognized.
 
 ## What it is
 
@@ -68,7 +68,7 @@ Then `hyprctl reload`.
 
 ```
 ptt begin        start dictating
-ptt end          stop dictating and type the text
+ptt end          stop dictating
 ptt install      install the stack, or reconfigure it
 ptt uninstall    remove the packages, model, and symlinks
 
