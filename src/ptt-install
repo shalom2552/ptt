@@ -417,6 +417,7 @@ uninstall_run() {
 # Every path out is a return, so an update never blocks an install.
 offer_update() {
     git -C "$PTT_ROOT" rev-parse --git-dir &>/dev/null || return 0
+    log_info "Checking for updates..."
     GIT_TERMINAL_PROMPT=0 git -C "$PTT_ROOT" fetch --quiet 2>/dev/null ||
         return 0
     local count
@@ -425,7 +426,7 @@ offer_update() {
     ((count)) || return 0
 
     heading "Update available"
-    printf '\n'
+    plan_title "New commits:"
     git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
         return 0
     printf '\n'
