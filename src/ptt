@@ -35,7 +35,12 @@ notify() {
 
 notify_warn() { notify "critical" 10000 "$1" "$2"; }
 
-notify_state() { notify "normal" "$1" ptt "$2"; }
+# The tray is best effort, the terminal line is what always lands.
+say_state() {
+    local timeout=$1 text=$2
+    log_info "$text"
+    notify "normal" "$timeout" ptt "$text"
+}
 
 # Off a key press there is no terminal, so failures also go to the screen.
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
@@ -43,7 +48,9 @@ trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
 
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
-        notify_warn "Voice typing not installed" "Run: ${PTT_ROOT/#$HOME/\~}/ptt install"
+        local hint="${PTT_ROOT/#$HOME/\~}/ptt install"
+        log_error "voice typing not installed, run $hint"
+        notify_warn "Voice typing not installed" "Run: $hint"
         exit 0
     fi
 }
@@ -68,7 +75,7 @@ end_session() {
     flock -n 9 || return 0
     session_live "$cookie" || return 0
     # A late end of a superseded session must not talk over the live one.
-    [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && notify_state 1000 done
+    [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && say_state 1000 done
     "$BIN" end --cookie "$cookie"
 }
 
@@ -77,7 +84,9 @@ watch_release() {
     if "$PTT_ROOT/src/ptt-keywatch" "$KEYCODE"; then
         end_session "$1"
     else
-        notify_warn ptt "key watcher failed, dictation stops on timeout"
+        local msg="key watcher failed, dictation stops on timeout"
+        log_warn "$msg"
+        notify_warn ptt "$msg"
     fi
 }
 
@@ -88,7 +97,10 @@ cmd_begin() {
     cookie="$RUN/ptt.cookie.$$"
     if [[ -n $prev ]] && session_live "$prev"; then
         # Only a session still held blocks a new one. A released one is ending.
-        [[ -e $prev.stop ]] || exit 0
+        if [[ ! -e $prev.stop ]]; then
+            log_warn "session already live"
+            exit 0
+        fi
     elif [[ -e $prev ]]; then
         # The engine reads its run-on punctuation off the cookie age.
         cp -p "$prev" "$cookie"
@@ -101,7 +113,7 @@ cmd_begin() {
         args+=("${DEFER_ARGS[@]}")
     fi
     printf '%s\n' "$cookie" >"$SESSION"
-    notify_state 30000 listening
+    say_state 30000 listening
     setsid -f "$BIN" begin "${args[@]}" # detached, outlives this process
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
@@ -112,9 +124,14 @@ cmd_begin() {
 
 cmd_end() {
     command -v "$BIN" &>/dev/null || exit 0
-    [[ -e $SESSION ]] || exit 0
-    local cookie
-    read -r cookie <"$SESSION"
+    local cookie=''
+    if [[ -e $SESSION ]]; then read -r cookie <"$SESSION" || true; fi
+    # A stamped cookie already ended. A missing one is a session still
+    # starting, which begin ends itself off the release below.
+    if [[ -z $cookie ]] || { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
+        log_warn "no session running"
+        return 0
+    fi
     : >"$cookie.stop"
     end_session "$cookie"
 }
