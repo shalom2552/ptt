@@ -45,15 +45,6 @@ The clone path is only a suggestion. Any path works. The installer links from
 wherever the clone is, and re-running it after a move offers to point the links
 back at the clone.
 
-The installer shows a plan, asks once, then announces each command as it runs.
-It lets you pick a speech model, and links the zsh and bash completions if
-those shells are installed. Tab completion works in a new shell. Re-running it
-gives a small menu instead of reinstalling.
-
-The clone is the install, so updating is a pull. `ptt install` checks for new
-commits first, lists them, and offers to pull. Answer no and the install runs
-as it always does.
-
 Pass `--step` to see each command and confirm it before it runs:
 
 ```
