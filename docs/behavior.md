@@ -56,17 +56,15 @@ Under `--punctuate-from-previous-timeout` the engine prepends `. ` with
 `--full-sentence` (1400). Age is the only input. Lands after the user config
 (1398), so `ptt-config.py` cannot strip it.
 
-## The compositor release bind gets dropped
+## The key release comes from the devices, not the compositor
 
-Hyprland loses release binds, so `ptt end` never runs and the engine types on
-until the 30s timeout. Open reports, no published cause: hyprwm/Hyprland#3208,
-#8800, #9240, #7675. The cause here is unconfirmed.
+Hyprland drops release binds, cause unpublished: hyprwm/Hyprland#3208, #8800,
+#9240, #7675. So only press is bound.
 
-`src/ptt-keywatch` is the backstop. It snapshots the keys held at `begin` with
-`EVIOCGKEY`, then ends the session when one comes up, on the release event or
-on a state read, whichever lands first. The state read is what covers a release
-the compositor never delivers. Reading `/dev/input/event*` needs the `input`
-group, so without it there is no backstop.
+`src/ptt-keywatch` ends the session instead. Keys held at `begin` are the
+snapshot (`EVIOCGKEY`), and the first of a release event or a state read
+showing one up wins. Reading `/dev/input/event*` needs the `input` group, so
+`src/ptt` refuses to begin without it.
 
 ## `WTYPE` is a process per call
 

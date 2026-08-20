@@ -3,7 +3,7 @@
 Push to talk voice typing on Wayland. Hold a key and speak, and the words are
 typed into whatever window has focus as they are recognized.
 
-Needs Arch, a Wayland compositor, and `yay`.
+Needs Arch, a Wayland compositor, python, and `yay`.
 
 ## How it works
 
@@ -11,7 +11,7 @@ ptt is a wrapper. [nerd-dictation](https://github.com/ideasman42/nerd-dictation)
 with [vosk](https://alphacephei.com/vosk/) does the speech,
 [wtype](https://github.com/atx/wtype) does the typing.
 
-- Key press runs `ptt begin`, key release runs `ptt end`.
+- Key press runs `ptt begin`, and `src/ptt-keywatch` ends it on the release.
 - nerd-dictation records the mic, vosk turns the sound into words, offline.
 - `src/ptt-config.py` sticks spoken punctuation onto the word before it, and
   puts a capital after a sentence ends.
@@ -33,21 +33,19 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 
 Moving the project dir breaks the links. Run install again to fix them.
 
-The `input` group is optional. It lets ptt end a session when the compositor
-drops the key release.
+Install joins the `input` group. Log out and back in for it to apply.
 
 ## Bind a key
 
-Hyprland, press and release:
+Hyprland, press only. ptt reads the release off the input devices.
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
-hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 ```
 
 Then `hyprctl reload`.
 
-Other compositors work too. Bind press to `ptt begin`, release to `ptt end`.
+Other compositors work too. Bind press to `ptt begin`.
 
 ## Usage
 

@@ -107,8 +107,7 @@ def watch(held, cookie):
                 del held[fd]
             elif held[fd] - down:
                 return 0
-        # A carried cookie is stamped already, so only one that went live ends
-        # the watch.
+        # A carried cookie is stamped, so only one that went live ends it.
         if stamped(cookie) is False:
             live = True
         elif live:

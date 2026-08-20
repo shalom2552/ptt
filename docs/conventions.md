@@ -39,10 +39,8 @@ Print only what applies. Nothing about a thing that is not there.
 1. Numbered plain English plan, no commands, then one `Proceed? [n/Y]`.
 2. Each command announced on one line as it runs.
 
-Mechanics go quiet, choices always ask.
-A mechanic is a step the plan covered: a package install, a symlink.
-A choice costs what the run cannot undo, like the input group's logout.
-A choice shows its command and asks in both modes.
+Mechanics go quiet. A mechanic is a step the plan covered: a package install,
+a symlink, a group.
 
 `-s` / `--step` confirms the mechanics too, so nothing runs unseen:
 
@@ -56,7 +54,6 @@ Execute? [n/Y]
 Declining stops an install. During uninstall it skips one command and
 continues, since the removals are independent. A completion link is the same
 exception: it skips and the install goes on, since completion is a convenience.
-So is the input group: declining costs the backstop, not the install.
 Prompts default to yes (`[n/Y]`). Menus name their default in the hint
 (`Choice [1-2, default 2]`) and default to the harmless option.
 

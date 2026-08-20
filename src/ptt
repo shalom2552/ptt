@@ -82,16 +82,19 @@ end_session() {
 }
 
 # Tests the device, not the group: a fresh gpasswd needs a login to take.
-can_watch() {
+# Nothing else ends a session, so a session that cannot be watched is a trap.
+require_watch() {
     local dev
     for dev in /dev/input/event*; do
         [[ -r $dev ]] && return 0
     done
-    return 1
+    log_error "cannot read the input devices, run ptt install"
+    notify_warn "Voice typing cannot run" \
+        "Run ptt install, then log out and back in."
+    exit 1
 }
 
-# Backgrounded by begin. The compositor release bind is dropped often enough
-# that the key state is what ends a session, not the bind alone.
+# Backgrounded by begin. The key state ends the session, not a release bind.
 watch_release() {
     local cookie=$1 rc=0
     "$PTT_ROOT/src/ptt-keywatch" "$cookie" || rc=$?
@@ -111,6 +114,7 @@ watch_release() {
 
 cmd_begin() {
     require_engine
+    require_watch
     local prev='' cookie deadline
     [[ -e $SESSION ]] && read -r prev <"$SESSION"
     cookie="$RUN/ptt.cookie.$$"
@@ -133,8 +137,7 @@ cmd_begin() {
         touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
-    # Armed before the engine, while the key is still down.
-    if can_watch; then watch_release "$cookie" & fi
+    watch_release "$cookie" & # armed while the key is still down
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
     : >"$LOG" # one session deep, so a failure is the one just seen
