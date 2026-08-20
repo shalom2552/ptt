@@ -107,6 +107,7 @@ cmd_begin() {
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
+    : >"$LOG" # one session deep, so a failure is the one just seen
     # Detached, so the engine outlives this process.
     setsid -f "$BIN" begin "${ARGS[@]}" --cookie "$cookie" >>"$LOG" 2>&1
     # A release that beats the engine to its cookie leaves end nothing to stop.
