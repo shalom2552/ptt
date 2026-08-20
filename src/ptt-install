@@ -215,6 +215,10 @@ print_bind_help() {
 }
 
 first_run() {
+    if ! command -v yay &>/dev/null; then
+        log_error "yay is not installed, the AUR packages need it"
+        exit 1
+    fi
     heading "ptt install"
     print_plan
     if ! confirm "Proceed?"; then
@@ -372,6 +376,11 @@ offer_update() {
     git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
         return 0
     printf '\n'
+    # Untracked files never block a rebase, tracked changes do.
+    if [[ -n "$(git -C "$PTT_ROOT" status --porcelain -uno)" ]]; then
+        log_warn "The clone has local changes. Update skipped."
+        return 0
+    fi
     confirm "Update ptt?" || return 0
     if ! git -C "$PTT_ROOT" pull --rebase; then
         log_warn "Update skipped, install carries on."
