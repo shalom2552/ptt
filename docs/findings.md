@@ -75,3 +75,14 @@ call at exit (1264).
 - `DOTOOL`, one process setup to teardown (223), `typedelay 12`. Command written
   unescaped into a newline delimited stream (255), so `new line` breaks.
 - `YDOTOOL`, a process per call (199), raw keycodes.
+
+## `wtype -s` sleeps after the device is up
+
+`main()` connects, creates the virtual keyboard, uploads the keymap, then runs
+the parsed commands in order, `wtype/main.c`. `-s` is one of those commands, so
+a leading `-s` holds off the first keystroke, not the device. A shim ahead of
+`wtype` on `PATH` can settle the device it just built.
+
+Read off the source, not measured. Whether 30ms covers Chromium, and whether a
+single deferred call loses its first character too, need someone at the
+microphone.
