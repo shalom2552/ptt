@@ -25,6 +25,7 @@ KEYCODE=88 # must match the keybind
 
 RUN="${XDG_RUNTIME_DIR:-/tmp}"
 SESSION="$RUN/ptt.session" # cookie path of the last begin
+LOG="$RUN/ptt.log" # output of the detached engine
 
 # One tray slot, so a notice replaces the last instead of stacking.
 notify() {
@@ -120,7 +121,7 @@ cmd_begin() {
     fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
-    setsid -f "$BIN" begin "${args[@]}" # detached, outlives this process
+    setsid -f "$BIN" begin "${args[@]}" >>"$LOG" 2>&1 # detached, outlives this process
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done
