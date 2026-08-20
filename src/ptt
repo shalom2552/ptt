@@ -64,7 +64,14 @@ can_watch() {
 }
 
 # The engine holds its cookie at mtime 0 while listening, stamps it on end.
-session_live() { [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]]; }
+# A crash leaves mtime 0 behind, so the pid in the cookie decides.
+session_live() {
+    local pid=''
+    [[ $(stat -c %Y "$1" 2>/dev/null) == 0 ]] || return 1
+    read -r pid <"$1" || true
+    case $pid in '' | *[!0-9]*) return 1 ;; esac
+    kill -0 "$pid" 2>/dev/null
+}
 
 # Ends one named session, never whichever one happens to be up.
 end_session() {
