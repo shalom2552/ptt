@@ -50,6 +50,10 @@ It lets you pick a speech model, and links the zsh and bash completions if
 those shells are installed. Tab completion works in a new shell. Re-running it
 gives a small menu instead of reinstalling.
 
+The clone is the install, so updating is a pull. `ptt install` checks for new
+commits first, lists them, and offers to pull. Answer no and the install runs
+as it always does.
+
 Pass `--step` to see each command and confirm it before it runs:
 
 ```
