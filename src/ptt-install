@@ -414,7 +414,31 @@ uninstall_run() {
     log_info "Done."
 }
 
+# Every path out is a return, so an update never blocks an install.
+offer_update() {
+    git -C "$PTT_ROOT" rev-parse --git-dir &>/dev/null || return 0
+    GIT_TERMINAL_PROMPT=0 git -C "$PTT_ROOT" fetch --quiet 2>/dev/null ||
+        return 0
+    local count
+    count=$(git -C "$PTT_ROOT" rev-list --count HEAD..@{u} 2>/dev/null) ||
+        return 0
+    ((count)) || return 0
+
+    heading "Update available"
+    printf '\n'
+    git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
+        return 0
+    printf '\n'
+    confirm "Update ptt?" || return 0
+    if ! git -C "$PTT_ROOT" pull --rebase; then
+        log_warn "Update skipped, install carries on."
+        return 0
+    fi
+    exec "$PTT_ROOT/src/ptt-install" install
+}
+
 cmd_install() {
+    offer_update
     if is_installed; then
         offer_links
         menu_installed
@@ -455,7 +479,7 @@ main() {
                 usage ptt-install
                 return 0
                 ;;
-            -s | --step) PTT_STEP=1 ;;
+            -s | --step) export PTT_STEP=1 ;;
             -m | --model)
                 model=1
                 model_arg="$a"
