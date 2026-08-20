@@ -310,6 +310,8 @@ uninstall_todo() {
     for i in "${!COMP_SHELLS[@]}"; do
         [[ -L ${COMP_LINKS[i]} ]] && RM_TODO+=("comp$i")
     done
+    [[ -n ${XDG_RUNTIME_DIR:-} ]] &&
+        compgen -G "$XDG_RUNTIME_DIR/ptt.*" >/dev/null && RM_TODO+=(runtime)
     : # a false last test must not return 1 into set -e
 }
 
@@ -328,6 +330,10 @@ uninstall_plan() {
             comp*)
                 i="${item#comp}"
                 plan_line "$((++n))" "remove $(arg "${COMP_LINKS[i]}")"
+                ;;
+            runtime)
+                plan_line "$((++n))" \
+                    "remove $(arg "$XDG_RUNTIME_DIR/ptt.*"), the session files"
                 ;;
         esac
     done
@@ -356,6 +362,10 @@ uninstall_run() {
                 i="${item#comp}"
                 run_cmd "unlink the ${COMP_SHELLS[i]} completion" \
                     sudo rm -f "${COMP_LINKS[i]}" || true
+                ;;
+            runtime)
+                run_cmd "remove the cookies, locks, log, and session pointer" \
+                    rm -f "$XDG_RUNTIME_DIR"/ptt.* || true
                 ;;
         esac
     done
