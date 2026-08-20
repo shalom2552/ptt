@@ -20,42 +20,6 @@ confirm() {
     esac
 }
 
-PTT_STEP="${PTT_STEP:-0}"
-
-announce() { log_info "$C_CMD$*$C_RESET"; }
-
-# A choice the user makes, so it is asked in both modes.
-ask_cmd() {
-    local note="$1"
-    shift
-    printf '\n    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
-    printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
-    if ! confirm "Execute?"; then
-        log_warn "skipped: $*"
-        return 1
-    fi
-    "$@"
-}
-
-# A mechanic, covered by the plan already agreed to. Only --step stops for it.
-run_cmd() {
-    if ((PTT_STEP)); then
-        ask_cmd "$@"
-        return
-    fi
-    shift
-    announce "$@"
-    "$@"
-}
-
-# Same, but a declined command means the rest of the run is pointless.
-run_or_stop() {
-    run_cmd "$@" || {
-        log_warn "Stopped. Nothing further done."
-        exit 1
-    }
-}
-
 # Menu picker. Writes the prompt to stderr, sets PICK to a 0-based index.
 PICK=0
 prompt_index() {
@@ -102,6 +66,42 @@ field() {
 }
 
 note() { printf '  %s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
+
+PTT_STEP="${PTT_STEP:-0}"
+
+announce() { log_info "$C_CMD$*$C_RESET"; }
+
+# A choice the user makes, so it is asked in both modes.
+ask_cmd() {
+    local note="$1"
+    shift
+    printf '\n    %s# %s%s\n' "$C_DIM" "$note" "$C_RESET"
+    printf '    %s$%s %s%s%s\n' "$C_DIM" "$C_RESET" "$C_CMD" "$*" "$C_RESET"
+    if ! confirm "Execute?"; then
+        log_warn "skipped: $*"
+        return 1
+    fi
+    "$@"
+}
+
+# A mechanic, covered by the plan already agreed to. Only --step stops for it.
+run_cmd() {
+    if ((PTT_STEP)); then
+        ask_cmd "$@"
+        return
+    fi
+    shift
+    announce "$@"
+    "$@"
+}
+
+# Same, but a declined command means the rest of the run is pointless.
+run_or_stop() {
+    run_cmd "$@" || {
+        log_warn "Stopped. Nothing further done."
+        exit 1
+    }
+}
 
 usage() { cat "$PTT_ROOT/share/help/$1.txt"; }
 
