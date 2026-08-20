@@ -295,7 +295,7 @@ uninstall_todo() {
     done
     mapfile -t -O "${#RM_PKGS[@]}" RM_PKGS < <(installed_model_pkgs)
     ((${#RM_PKGS[@]})) && RM_TODO+=(pkgs)
-    [[ -e $ND_CONFIG ]] && RM_TODO+=(cfg)
+    [[ -e $MODEL_LINK || -L $MODEL_LINK ]] && RM_TODO+=(cfg)
     [[ -e $BIN_LINK || -L $BIN_LINK ]] && RM_TODO+=(link)
     for i in "${!COMP_SHELLS[@]}"; do
         [[ -L ${COMP_LINKS[i]} ]] && RM_TODO+=("comp$i")
@@ -310,7 +310,7 @@ uninstall_plan() {
         case "$item" in
             pkgs) plan_line "$((++n))" "remove $(arg "${RM_PKGS[*]}")" ;;
             cfg)
-                plan_line "$((++n))" "remove $(arg "${ND_CONFIG/#$HOME/\~}")"
+                plan_line "$((++n))" "remove $(arg "${MODEL_LINK/#$HOME/\~}")"
                 ;;
             link)
                 plan_line "$((++n))" "remove $(arg "${BIN_LINK/#$HOME/\~}")"
@@ -336,7 +336,8 @@ uninstall_run() {
                     yay -Rns "${RM_PKGS[@]}" || true
                 ;;
             cfg)
-                run_cmd "remove the model symlink" rm -rf "$ND_CONFIG" || true
+                run_cmd "remove the model symlink" rm -f "$MODEL_LINK" || true
+                rmdir "$ND_CONFIG" 2>/dev/null || true
                 ;;
             link)
                 run_cmd "unlink ptt from PATH" rm -f "$BIN_LINK" || true
