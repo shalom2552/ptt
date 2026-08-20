@@ -1,7 +1,9 @@
 # ptt
 
-Push to talk voice typing on Linux. Hold a key, speak, release, and the text is
-typed into whatever window has focus.
+Push to talk voice typing on Linux. Hold a key and speak, and the words are
+typed into whatever window has focus as they are recognized.
+
+Works on Arch with Hyprland and Wayland. Nothing else yet.
 
 ## What it is
 
@@ -18,21 +20,24 @@ What ptt adds is the setup and the glue: an installer that puts the packages,
 the model, and the symlinks in place, and a small script your compositor calls
 on key press and key release.
 
+## How it works
+
+- The keybind runs `ptt begin` on key press and `ptt end` on key release.
+- nerd-dictation records from the microphone and vosk turns it into text,
+  offline.
+- `src/ptt-config.py` attaches spoken punctuation to the word before it and
+  capitalizes after a sentence ends.
+- wtype types the words into the focused window as you speak.
+
 ## Features
 
+- Live typing, words land as you speak.
+- Offline, nothing leaves the machine.
+- Light, ~40 MB default model.
+- No daemon, nothing runs between presses.
+- Three model sizes, swap any time.
 - Punctuation marks support.
 - Tab completion in zsh and bash.
-
-## Status
-
-Works on Arch with Hyprland and Wayland. Nothing else yet. Widening it to the
-main distros is tracked in
-[issue #1](https://github.com/shalom2552/ptt/issues/1).
-
-Text appears as you speak if ptt can read your input devices, which needs the
-`input` group and a login since you joined it. Otherwise the whole utterance
-appears when you release the key. ptt picks the mode on every press, there is
-nothing to configure.
 
 ## Install
 
@@ -41,9 +46,8 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-The clone path is only a suggestion. Any path works. The installer links from
-wherever the clone is, and re-running it after a move offers to point the links
-back at the clone.
+Any clone path works. Moving the clone breaks the links. Run install again to
+repoint them.
 
 Pass `--step` to see each command and confirm it before it runs:
 
@@ -56,8 +60,8 @@ Pass `--step` to see each command and confirm it before it runs:
 Hyprland, press and release:
 
 ```lua
-hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
-hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })
+hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
+hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 ```
 
 Then `hyprctl reload`.
@@ -66,7 +70,7 @@ Then `hyprctl reload`.
 
 ```
 ptt begin        start dictating
-ptt end          stop dictating and type the text
+ptt end          stop dictating
 ptt install      install the stack, or reconfigure it
 ptt uninstall    remove the packages, model, and symlinks
 

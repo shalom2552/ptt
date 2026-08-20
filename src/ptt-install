@@ -15,7 +15,6 @@ BIN_LINK="$HOME/.local/bin/ptt"
 MODEL_LINK="$ND_CONFIG/model"
 MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
-USER_NAME="${USER:-$(id -un)}"
 
 # A shell that is not installed has no link directory.
 COMP_SHELLS=(zsh bash)
@@ -41,15 +40,6 @@ DEFAULT_MODEL=0
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 pkg_installed() { pacman -Qq "$1" &>/dev/null; }
-
-# The group database, not this session's credentials.
-group_in_db() {
-    getent group input 2>/dev/null |
-        cut -d: -f4 | tr ',' '\n' | grep -qx "$USER_NAME"
-}
-
-# What this session actually has. Only set at login, so it can lag the database.
-group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
 
 is_installed() {
     command -v "$ND_BIN" &>/dev/null && [[ -L $MODEL_LINK ]]
@@ -189,32 +179,6 @@ install_model() {
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at $link"
 }
 
-offer_group() {
-    heading "Live text needs the input group"
-    printf '\n'
-    note "Join for live text that appears while speaking."
-    note "Decline for deferred text on key release."
-    ask_cmd "join the input group, applies after logout" \
-        sudo gpasswd -a "$USER_NAME" input
-}
-
-print_mode() {
-    local group_added="${1:-0}"
-    if group_in_session; then
-        field mode live "text appears while speaking"
-    else
-        field mode deferred "the utterance appears on key release"
-    fi
-    if ((group_added)); then
-        printf '\n'
-        note "Log out and back in for the input group to apply."
-    elif group_in_db && ! group_in_session; then
-        printf '\n'
-        note "This session predates the input group membership."
-        note "Log out and back in for live text."
-    fi
-}
-
 print_plan() {
     local n=0 i dir
     plan_title "ptt install will:"
@@ -230,10 +194,6 @@ print_plan() {
         plan_line "$((++n))" \
             "link the ${COMP_SHELLS[i]} completion into $(arg "$dir")"
     done
-    if ! group_in_db; then
-        plan_line "$((++n))" \
-            "offer to join the $(arg input) group for live text"
-    fi
     printf '\n'
     plan_step_note
 }
@@ -276,16 +236,12 @@ first_run() {
         ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
     link_completions
 
-    local group_added=0
-    if ! group_in_db && offer_group; then group_added=1; fi
-
     heading "ptt installed"
     printf '\n'
     field packages "${REPO_PKGS[*]} ${AUR_PKGS[*]}"
     field model "${MODEL_DIRS[model_idx]} (${MODEL_VERS[model_idx]})" \
         "${MODEL_LABELS[model_idx]}"
     field ptt "${BIN_LINK/#$HOME/\~}"
-    print_mode "$group_added"
     printf '\n'
     print_bind_help
 }
@@ -299,14 +255,6 @@ change_model() {
     printf '\n'
     field model "${MODEL_DIRS[i]} (${MODEL_VERS[i]})" "${MODEL_LABELS[i]}"
     field link "${MODEL_LINK/#$HOME/\~}"
-    print_mode 0
-}
-
-join_group() {
-    local group_added=0
-    offer_group && group_added=1
-    printf '\n'
-    print_mode "$group_added"
 }
 
 menu_installed() {
@@ -321,15 +269,11 @@ menu_installed() {
 
     local -a labels=() actions=()
     labels+=("change model") actions+=(change_model)
-    if ! group_in_db; then
-        labels+=("join the input group for live text") actions+=(join_group)
-    fi
     labels+=("quit") actions+=(:)
 
     heading "ptt is installed"
     printf '\n'
     field model "$dir ($ver)" "$label"
-    print_mode 0
     printf '\n'
     local i
     for i in "${!labels[@]}"; do
@@ -356,7 +300,6 @@ uninstall_todo() {
     for i in "${!COMP_SHELLS[@]}"; do
         [[ -L ${COMP_LINKS[i]} ]] && RM_TODO+=("comp$i")
     done
-    if group_in_db; then RM_TODO+=(group); fi
 }
 
 uninstall_plan() {
@@ -375,7 +318,6 @@ uninstall_plan() {
                 i="${item#comp}"
                 plan_line "$((++n))" "remove $(arg "${COMP_LINKS[i]}")"
                 ;;
-            group) plan_line "$((++n))" "leave the $(arg input) group" ;;
         esac
     done
     printf '\n'
@@ -402,12 +344,6 @@ uninstall_run() {
                 i="${item#comp}"
                 run_cmd "unlink the ${COMP_SHELLS[i]} completion" \
                     sudo rm -f "${COMP_LINKS[i]}" || true
-                ;;
-            group)
-                ask_cmd "leave the input group" \
-                    sudo gpasswd -d "$USER_NAME" input || continue
-                log_info "The input group is dropped in the database."
-                log_info "Log out and back in to clear it from this session."
                 ;;
         esac
     done

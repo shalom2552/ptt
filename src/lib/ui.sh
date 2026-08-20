@@ -71,7 +71,6 @@ PTT_STEP="${PTT_STEP:-0}"
 
 announce() { log_info "$C_CMD$*$C_RESET"; }
 
-# A choice the user makes, so it is asked in both modes.
 ask_cmd() {
     local note="$1"
     shift
