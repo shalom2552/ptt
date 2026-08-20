@@ -85,6 +85,14 @@ cmd_begin() {
             log_warn "session already live"
             exit 0
         fi
+        # Two engines typing into one window is worse than a late start.
+        deadline=$((SECONDS + 3))
+        while ((SECONDS < deadline)) && session_live "$prev"; do sleep 0.1; done
+        if session_live "$prev"; then
+            log_warn "the previous session has not ended"
+            notify_warn "Voice typing busy" "The last session is stuck."
+            exit 1
+        fi
     elif [[ -e $prev ]]; then
         # The engine reads its run-on punctuation off the cookie age.
         touch -r "$prev" "$cookie"
