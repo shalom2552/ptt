@@ -96,6 +96,12 @@ cmd_begin() {
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done
+    # A cookie that never goes live means the engine is already gone.
+    if ! session_live "$cookie"; then
+        log_error "engine did not start, see $LOG"
+        notify_warn "Voice typing failed" "The engine did not start. See $LOG"
+        exit 1
+    fi
     [[ -e $cookie.stop ]] || return 0
     end_session "$cookie"
 }
