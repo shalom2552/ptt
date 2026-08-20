@@ -7,21 +7,13 @@ Works on Arch with Hyprland and Wayland. Nothing else yet.
 
 MIT, see LICENSE. The tools it installs carry their own terms, below.
 
-## What it is
-
-A wrapper. ptt does no speech recognition and no typing of its own. It glues
-together tools that already exist and makes them easy to set up and bind to a
-key:
+## Built on
 
 - [nerd-dictation](https://github.com/ideasman42/nerd-dictation) with
   [vosk](https://alphacephei.com/vosk/) for offline speech to text. GPL3, and
   the vosk models are Apache.
 - [wtype](https://github.com/atx/wtype) to type the result into the focused
   window. MIT.
-
-What ptt adds is the setup and the glue: an installer that puts the packages,
-the model, and the symlinks in place, and a small script your compositor calls
-on key press and key release.
 
 ## How it works
 
@@ -34,9 +26,6 @@ on key press and key release.
 
 ## Features
 
-- Live typing, words land as you speak.
-- Offline, nothing leaves the machine.
-- Light, ~40 MB default model.
 - No daemon, nothing runs between presses.
 - Three model sizes, swap any time.
 - Punctuation marks support.
@@ -86,7 +75,6 @@ linked. If nothing in the Hyprland config mentions ptt it prints the bind lines
 above.
 
 The first `ptt begin` shows a listening notification, `ptt end` shows done.
-Nothing runs between presses.
 
 ## Troubleshooting
 
@@ -112,5 +100,6 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -h, --help       show this help
 ```
 
-You normally only run `install` and `uninstall` by hand. `begin` and `end` are
-what the keybind calls. A bare `ptt` prints the help.
+A bare `ptt` prints the help.
+
+Uninstall leaves the clone in place.
