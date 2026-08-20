@@ -189,7 +189,7 @@ install_model() {
 }
 
 offer_group() {
-    heading "The release backstop needs the input group"
+    heading "The input group"
     printf '\n'
     note "Join to end dictation on a key release the compositor drops."
     note "Decline and a dropped release runs to the 30s timeout."

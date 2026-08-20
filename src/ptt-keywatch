@@ -74,15 +74,12 @@ def released(fd, keys):
     return False
 
 
-# A carried cookie is stamped already, so only one that went live counts.
-def session_over(cookie, live):
+# True once the engine ends the session, None before it writes the cookie.
+def stamped(cookie):
     try:
-        stamped = os.stat(cookie).st_mtime != 0
+        return os.stat(cookie).st_mtime != 0
     except OSError:
-        return live, live
-    if not stamped:
-        return True, False
-    return live, live
+        return None
 
 
 def watch(held, cookie):
@@ -110,8 +107,11 @@ def watch(held, cookie):
                 del held[fd]
             elif held[fd] - down:
                 return 0
-        live, over = session_over(cookie, live)
-        if over:
+        # A carried cookie is stamped already, so only one that went live ends
+        # the watch.
+        if stamped(cookie) is False:
+            live = True
+        elif live:
             return 2
     return 1
 

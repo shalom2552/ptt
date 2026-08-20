@@ -81,22 +81,30 @@ end_session() {
     rm -f "$cookie.stop" "$cookie.lock"
 }
 
+# Tests the device, not the group: a fresh gpasswd needs a login to take.
+can_watch() {
+    local dev
+    for dev in /dev/input/event*; do
+        [[ -r $dev ]] && return 0
+    done
+    return 1
+}
+
 # Backgrounded by begin. The compositor release bind is dropped often enough
 # that the key state is what ends a session, not the bind alone.
 watch_release() {
     local cookie=$1 rc=0
     "$PTT_ROOT/src/ptt-keywatch" "$cookie" || rc=$?
     case $rc in
-        # The flag tells a held session from a released one at the next begin.
         0)
+            # Tells a held session from a released one at the next begin.
             : >"$cookie.stop"
             end_session "$cookie"
             ;;
         2) ;; # the session ended without the watch
         *)
-            local msg="key watcher failed, dictation stops on timeout"
-            log_warn "$msg"
-            notify_warn ptt "$msg"
+            log_warn "key watcher failed, dictation stops on timeout"
+            notify_warn "Key watcher failed" "Dictation stops on the timeout."
             ;;
     esac
 }
@@ -125,7 +133,8 @@ cmd_begin() {
         touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
-    watch_release "$cookie" & # armed before the engine, while the key is down
+    # Armed before the engine, while the key is still down.
+    if can_watch; then watch_release "$cookie" & fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
     : >"$LOG" # one session deep, so a failure is the one just seen

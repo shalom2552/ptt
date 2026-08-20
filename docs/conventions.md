@@ -56,6 +56,7 @@ Execute? [n/Y]
 Declining stops an install. During uninstall it skips one command and
 continues, since the removals are independent. A completion link is the same
 exception: it skips and the install goes on, since completion is a convenience.
+So is the input group: declining costs the backstop, not the install.
 Prompts default to yes (`[n/Y]`). Menus name their default in the hint
 (`Choice [1-2, default 2]`) and default to the harmless option.
 
