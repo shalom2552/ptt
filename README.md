@@ -3,6 +3,8 @@
 Push to talk voice typing on Linux. Hold a key and speak, and the words are
 typed into whatever window has focus as they are recognized.
 
+Works on Arch with Hyprland and Wayland. Nothing else yet.
+
 ## What it is
 
 A wrapper. ptt does no speech recognition and no typing of its own. It glues
@@ -29,12 +31,13 @@ on key press and key release.
 
 ## Features
 
+- Live typing, words land as you speak.
+- Offline, nothing leaves the machine.
+- Light, ~40 MB default model.
+- No daemon, nothing runs between presses.
+- Three model sizes, swap any time.
 - Punctuation marks support.
 - Tab completion in zsh and bash.
-
-## Status
-
-Works on Arch with Hyprland and Wayland. Nothing else yet.
 
 ## Install
 
@@ -43,9 +46,8 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-The clone path is only a suggestion. Any path works. The installer links from
-wherever the clone is, and re-running it after a move offers to point the links
-back at the clone.
+Any clone path works. Moving the clone breaks the links. Run install again to
+repoint them.
 
 Pass `--step` to see each command and confirm it before it runs:
 
@@ -58,8 +60,8 @@ Pass `--step` to see each command and confirm it before it runs:
 Hyprland, press and release:
 
 ```lua
-hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt begin"))
-hl.bind("F12", hl.dsp.exec_cmd("~/.local/share/ptt/ptt end"), { release = true })
+hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
+hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 ```
 
 Then `hyprctl reload`.
