@@ -35,10 +35,9 @@ notify() {
 
 notify_warn() { notify "critical" 10000 "$1" "$2"; }
 
-# The tray is best effort, the terminal line is what always lands.
 say_state() {
     local timeout=$1 text=$2
-    log_info "$text"
+    printf '%s\n' "$text"
     notify "normal" "$timeout" ptt "$text"
 }
 
@@ -126,8 +125,7 @@ cmd_end() {
     command -v "$BIN" &>/dev/null || exit 0
     local cookie=''
     if [[ -e $SESSION ]]; then read -r cookie <"$SESSION" || true; fi
-    # A stamped cookie already ended. A missing one is a session still
-    # starting, which begin ends itself off the release below.
+    # A stamped cookie already ended. A missing one is still starting.
     if [[ -z $cookie ]] || { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
         log_warn "no session running"
         return 0
