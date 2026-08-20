@@ -164,7 +164,13 @@ for a in "$@"; do
 done
 
 # A flag may come before its command, so this waits for the whole line.
-if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt "$MODEL_ARG"; fi
+if ((MODEL)); then
+    if [[ -z $CMD ]]; then
+        CMD=install
+    elif [[ $CMD != install ]]; then
+        bad_arg ptt "$MODEL_ARG"
+    fi
+fi
 if ((STEP)); then
     case "$CMD" in
         install | uninstall) export PTT_STEP=1 ;;
