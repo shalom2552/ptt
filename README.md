@@ -75,6 +75,26 @@ hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 
 Then `hyprctl reload`.
 
+## First run
+
+Install prints a numbered plan and asks once, then a model menu, then what it
+linked. If nothing in the Hyprland config mentions ptt it prints the bind lines
+above.
+
+The first `ptt begin` shows a listening notification, `ptt end` shows done.
+Nothing runs between presses.
+
+## Troubleshooting
+
+The engine runs detached and writes to `$XDG_RUNTIME_DIR/ptt.log`, one session
+deep. Read it first.
+
+- No audio: nothing is typed and the log has no recognized text. Check the
+  microphone with `wpctl status`.
+- No focused window: `wtype` fails, the engine dies, and `ptt end` reports no
+  session running.
+- Missing model: the engine exits at once. Run `ptt --model` to relink one.
+
 ## Usage
 
 ```
