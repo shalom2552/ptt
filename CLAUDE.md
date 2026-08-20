@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-`docs/conventions.md` is how the tools behave. This is how to work on them.
+`docs/conventions.md` is how the tools behave, and beats any ticket that says
+otherwise. This is how to work on them.
 
 ## Writing
 

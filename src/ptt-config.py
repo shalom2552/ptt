@@ -14,19 +14,18 @@ PUNCTUATION = {
     "new line": "\n",
 }
 
-# Spoken phrase to text. Stands on its own as a word.
-WORDS = {}
-
 # The next word is capitalized after any of these.
 SENTENCE_END = ".?!\n"
 
 
 def _phrase_lengths(*tables):
-    return sorted({len(phrase.split()) for t in tables for phrase in t}, reverse=True)
+    return sorted(
+        {len(phrase.split()) for t in tables for phrase in t}, reverse=True
+    )
 
 
 def _replace(words):
-    lengths = _phrase_lengths(PUNCTUATION, WORDS)
+    lengths = _phrase_lengths(PUNCTUATION)
     out = []
     i = 0
     while i < len(words):
@@ -38,10 +37,6 @@ def _replace(words):
                     out[-1] += PUNCTUATION[phrase]
                 else:
                     out.append(PUNCTUATION[phrase])
-                i += size
-                break
-            if phrase in WORDS:
-                out.append(WORDS[phrase])
                 i += size
                 break
         else:

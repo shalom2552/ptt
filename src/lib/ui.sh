@@ -1,7 +1,9 @@
 # ui.sh - headings, prompts, plan output, running commands, and help. Uses
 # the colors and log functions from log.sh, which has to be sourced first.
 
-rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
+RULE='────────────────────────────────────────────────────────'
+
+rule() { printf '%s%s%s\n' "$C_DIM" "$RULE" "$C_RESET"; }
 
 heading() {
     printf '\n'
@@ -27,7 +29,10 @@ prompt_index() {
     hint="1-$count"
     [[ -n $default ]] && hint="$hint, default $((default + 1))"
     while true; do
-        read -rp "$label [$hint]: " reply || reply=''
+        if ! read -rp "$label [$hint]: " reply; then
+            [[ -n $default ]] || return 1
+            reply=''
+        fi
         [[ -z $reply && -n $default ]] && reply=$((default + 1))
         if [[ $reply =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= count)); then
             PICK=$((reply - 1))

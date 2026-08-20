@@ -11,7 +11,8 @@ if [[ -t 1 ]]; then
     C_WARN=$'\e[1;33m'
     C_ERROR=$'\e[1;31m'
 else
-    C_RESET='' C_BOLD='' C_DIM='' C_PTT='' C_NUM='' C_CMD='' C_ARG='' C_WARN='' C_ERROR=''
+    C_RESET='' C_BOLD='' C_DIM='' C_PTT='' C_NUM=''
+    C_CMD='' C_ARG='' C_WARN='' C_ERROR=''
 fi
 
 # Tagged [ptt] so output never reads as pacman's. The level survives a pipe.

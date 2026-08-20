@@ -19,10 +19,6 @@ ARGS=(
     --config "$PTT_ROOT/src/ptt-config.py"
 )
 
-RUN="${XDG_RUNTIME_DIR:-/tmp}"
-SESSION="$RUN/ptt.session" # cookie path of the last begin
-LOG="$RUN/ptt.log" # output of the detached engine
-
 # One tray slot, so a notice replaces the last instead of stacking.
 notify() {
     local urgency=$1 timeout=$2 title=$3 body=$4
@@ -42,12 +38,23 @@ say_state() {
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"
       notify_warn "ptt failed" "line $LINENO: $BASH_COMMAND"' ERR
 
+# Every runtime file is per session. No session directory, no run.
+if [[ -z ${XDG_RUNTIME_DIR:-} ]]; then
+    log_error "XDG_RUNTIME_DIR is not set"
+    notify_warn "ptt cannot run" "XDG_RUNTIME_DIR is not set."
+    exit 1
+fi
+
+RUN="$XDG_RUNTIME_DIR"
+SESSION="$RUN/ptt.session" # cookie path of the last begin
+LOG="$RUN/ptt.log" # output of the detached engine
+
 require_engine() {
     if ! command -v "$BIN" &>/dev/null; then
         local hint="${PTT_ROOT/#$HOME/\~}/ptt install"
         log_error "voice typing not installed, run $hint"
         notify_warn "Voice typing not installed" "Run: $hint"
-        exit 0
+        exit 1
     fi
 }
 
@@ -71,6 +78,7 @@ end_session() {
     # A late end of a superseded session must not talk over the live one.
     [[ -e $SESSION && $(<"$SESSION") == "$cookie" ]] && say_state 1000 done
     "$BIN" end --cookie "$cookie"
+    rm -f "$cookie.stop" "$cookie.lock"
 }
 
 cmd_begin() {
@@ -84,6 +92,14 @@ cmd_begin() {
             log_warn "session already live"
             exit 0
         fi
+        # Two engines typing into one window is worse than a late start.
+        deadline=$((SECONDS + 3))
+        while ((SECONDS < deadline)) && session_live "$prev"; do sleep 0.1; done
+        if session_live "$prev"; then
+            log_warn "the previous session has not ended"
+            notify_warn "Voice typing busy" "The last session is stuck."
+            exit 1
+        fi
     elif [[ -e $prev ]]; then
         # The engine reads its run-on punctuation off the cookie age.
         touch -r "$prev" "$cookie"
@@ -91,21 +107,29 @@ cmd_begin() {
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
+    : >"$LOG" # one session deep, so a failure is the one just seen
     # Detached, so the engine outlives this process.
     setsid -f "$BIN" begin "${ARGS[@]}" --cookie "$cookie" >>"$LOG" 2>&1
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done
+    # A cookie that never goes live means the engine is already gone.
+    if ! session_live "$cookie"; then
+        log_error "engine did not start, see $LOG"
+        notify_warn "Voice typing failed" "The engine did not start. See $LOG"
+        exit 1
+    fi
     [[ -e $cookie.stop ]] || return 0
     end_session "$cookie"
 }
 
 cmd_end() {
-    command -v "$BIN" &>/dev/null || exit 0
+    require_engine
     local cookie=''
     if [[ -e $SESSION ]]; then read -r cookie <"$SESSION" || true; fi
     # A stamped cookie already ended. A missing one is still starting.
-    if [[ -z $cookie ]] || { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
+    if [[ -z $cookie ]] ||
+        { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
         log_warn "no session running"
         return 0
     fi
@@ -116,13 +140,18 @@ cmd_end() {
 CMD=''
 MODEL=0
 MODEL_ARG=''
+STEP=0
+STEP_ARG=''
 for a in "$@"; do
     case "$a" in
         -h | --help)
             usage ptt
             exit 0
             ;;
-        -s | --step) export PTT_STEP=1 ;;
+        -s | --step)
+            STEP=1
+            STEP_ARG="$a"
+            ;;
         -m | --model)
             MODEL=1
             MODEL_ARG="$a"
@@ -136,7 +165,19 @@ for a in "$@"; do
 done
 
 # A flag may come before its command, so this waits for the whole line.
-if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt "$MODEL_ARG"; fi
+if ((MODEL)); then
+    if [[ -z $CMD ]]; then
+        CMD=install
+    elif [[ $CMD != install ]]; then
+        bad_arg ptt "$MODEL_ARG"
+    fi
+fi
+if ((STEP)); then
+    case "$CMD" in
+        install | uninstall) export PTT_STEP=1 ;;
+        *) bad_arg ptt "$STEP_ARG" ;;
+    esac
+fi
 
 case "$CMD" in
     begin) cmd_begin ;;
@@ -144,7 +185,7 @@ case "$CMD" in
     install)
         FLAGS=()
         if ((MODEL)); then FLAGS=(--model); fi
-        exec "$PTT_ROOT/src/ptt-install" install "${FLAGS[@]}"
+        exec "$PTT_ROOT/src/ptt-install" install ${FLAGS[@]+"${FLAGS[@]}"}
         ;;
     uninstall) exec "$PTT_ROOT/src/ptt-install" uninstall ;;
     *) usage ptt ;;

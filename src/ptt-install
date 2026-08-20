@@ -164,14 +164,16 @@ choose_model() {
         printf '     %s%s%s\n\n' \
             "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET"
     done
-    note "Speed is CPU bound. The big model lags on modest hardware."
+    note "Sizes are downloads. Speed is CPU bound."
+    note "The big model lags on modest hardware."
     printf '\n'
     prompt_index "${#MODEL_PKGS[@]}" "Model" "$DEFAULT_MODEL"
 }
 
 install_model() {
     local i="$1" link="${MODEL_LINK/#$HOME/\~}"
-    run_or_stop "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]}" \
+    run_or_stop \
+        "install the ${MODEL_DIRS[i]} model, ${MODEL_SIZES[i]} download" \
         yay -S --needed --noconfirm "${MODEL_PKGS[i]}"
     mkdir -p "$ND_CONFIG"
     run_or_stop "point $ND_BIN at that model" \
@@ -208,13 +210,17 @@ print_bind_help() {
     local p="${PTT_ROOT/#$HOME/\~}/ptt"
     log_info "No keybind found. Add to the Hyprland config:"
     printf '\n'
-    note "hl.bind(\"F12\", hl.dsp.exec_cmd(\"$p begin\"))"
-    note "hl.bind(\"F12\", hl.dsp.exec_cmd(\"$p end\"), { release = true })"
+    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p begin\"))"
+    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p end\"), { release = true })"
     printf '\n'
     log_info "Then run: hyprctl reload"
 }
 
 first_run() {
+    if ! command -v yay &>/dev/null; then
+        log_error "yay is not installed, the AUR packages need it"
+        exit 1
+    fi
     heading "ptt install"
     print_plan
     if ! confirm "Proceed?"; then
@@ -232,8 +238,12 @@ first_run() {
     install_model "$model_idx"
 
     mkdir -p "${BIN_LINK%/*}"
-    run_or_stop "link ptt onto PATH for terminal use" \
-        ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    if [[ ! -e $BIN_LINK || -L $BIN_LINK ]]; then
+        run_or_stop "link ptt onto PATH for terminal use" \
+            ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    else
+        log_warn "${BIN_LINK/#$HOME/\~} is a real file, left as it is"
+    fi
     link_completions
 
     heading "ptt installed"
@@ -295,11 +305,14 @@ uninstall_todo() {
     done
     mapfile -t -O "${#RM_PKGS[@]}" RM_PKGS < <(installed_model_pkgs)
     ((${#RM_PKGS[@]})) && RM_TODO+=(pkgs)
-    [[ -e $ND_CONFIG ]] && RM_TODO+=(cfg)
+    [[ -e $MODEL_LINK || -L $MODEL_LINK ]] && RM_TODO+=(cfg)
     [[ -e $BIN_LINK || -L $BIN_LINK ]] && RM_TODO+=(link)
     for i in "${!COMP_SHELLS[@]}"; do
         [[ -L ${COMP_LINKS[i]} ]] && RM_TODO+=("comp$i")
     done
+    [[ -n ${XDG_RUNTIME_DIR:-} ]] &&
+        compgen -G "$XDG_RUNTIME_DIR/ptt.*" >/dev/null && RM_TODO+=(runtime)
+    : # a false last test must not return 1 into set -e
 }
 
 uninstall_plan() {
@@ -309,7 +322,7 @@ uninstall_plan() {
         case "$item" in
             pkgs) plan_line "$((++n))" "remove $(arg "${RM_PKGS[*]}")" ;;
             cfg)
-                plan_line "$((++n))" "remove $(arg "${ND_CONFIG/#$HOME/\~}")"
+                plan_line "$((++n))" "remove $(arg "${MODEL_LINK/#$HOME/\~}")"
                 ;;
             link)
                 plan_line "$((++n))" "remove $(arg "${BIN_LINK/#$HOME/\~}")"
@@ -317,6 +330,10 @@ uninstall_plan() {
             comp*)
                 i="${item#comp}"
                 plan_line "$((++n))" "remove $(arg "${COMP_LINKS[i]}")"
+                ;;
+            runtime)
+                plan_line "$((++n))" \
+                    "remove $(arg "$XDG_RUNTIME_DIR/ptt.*"), the session files"
                 ;;
         esac
     done
@@ -335,7 +352,8 @@ uninstall_run() {
                     yay -Rns "${RM_PKGS[@]}" || true
                 ;;
             cfg)
-                run_cmd "remove the model symlink" rm -rf "$ND_CONFIG" || true
+                run_cmd "remove the model symlink" rm -f "$MODEL_LINK" || true
+                rmdir "$ND_CONFIG" 2>/dev/null || true
                 ;;
             link)
                 run_cmd "unlink ptt from PATH" rm -f "$BIN_LINK" || true
@@ -344,6 +362,10 @@ uninstall_run() {
                 i="${item#comp}"
                 run_cmd "unlink the ${COMP_SHELLS[i]} completion" \
                     sudo rm -f "${COMP_LINKS[i]}" || true
+                ;;
+            runtime)
+                run_cmd "remove the cookies, locks, log, and session pointer" \
+                    rm -f "$XDG_RUNTIME_DIR"/ptt.* || true
                 ;;
         esac
     done
@@ -366,6 +388,11 @@ offer_update() {
     git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
         return 0
     printf '\n'
+    # Untracked files never block a rebase, tracked changes do.
+    if [[ -n "$(git -C "$PTT_ROOT" status --porcelain -uno)" ]]; then
+        log_warn "The clone has local changes. Update skipped."
+        return 0
+    fi
     confirm "Update ptt?" || return 0
     if ! git -C "$PTT_ROOT" pull --rebase; then
         log_warn "Update skipped, install carries on."
@@ -413,7 +440,7 @@ main() {
     for a in "$@"; do
         case "$a" in
             -h | --help)
-                usage ptt-install
+                usage ptt
                 return 0
                 ;;
             -s | --step) export PTT_STEP=1 ;;
@@ -422,10 +449,10 @@ main() {
                 model_arg="$a"
                 ;;
             install | uninstall)
-                if [[ -n $cmd ]]; then bad_arg ptt-install "$a"; fi
+                if [[ -n $cmd ]]; then bad_arg ptt "$a"; fi
                 cmd="$a"
                 ;;
-            *) bad_arg ptt-install "$a" ;;
+            *) bad_arg ptt "$a" ;;
         esac
     done
 
@@ -434,7 +461,7 @@ main() {
             if ((model)); then cmd_model; else cmd_install; fi
             ;;
         uninstall)
-            if ((model)); then bad_arg ptt-install "$model_arg"; fi
+            if ((model)); then bad_arg ptt "$model_arg"; fi
             cmd_uninstall
             ;;
     esac

@@ -1,6 +1,6 @@
 # Conventions
 
-How the tools behave. Beats any ticket that says otherwise.
+How the tools behave.
 
 ## Voice
 
