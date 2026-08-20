@@ -5,6 +5,8 @@ typed into whatever window has focus as they are recognized.
 
 Works on Arch with Hyprland and Wayland. Nothing else yet.
 
+MIT, see LICENSE. The tools it installs carry their own terms, below.
+
 ## What it is
 
 A wrapper. ptt does no speech recognition and no typing of its own. It glues
@@ -12,9 +14,10 @@ together tools that already exist and makes them easy to set up and bind to a
 key:
 
 - [nerd-dictation](https://github.com/ideasman42/nerd-dictation) with
-  [vosk](https://alphacephei.com/vosk/) for offline speech to text
+  [vosk](https://alphacephei.com/vosk/) for offline speech to text. GPL3, and
+  the vosk models are Apache.
 - [wtype](https://github.com/atx/wtype) to type the result into the focused
-  window
+  window. MIT.
 
 What ptt adds is the setup and the glue: an installer that puts the packages,
 the model, and the symlinks in place, and a small script your compositor calls
@@ -53,7 +56,8 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 
 Install goes to the network three times: a `git fetch` to check the clone for
 updates, an AUR build of the engine, and a vosk model download from
-alphacephei.com through the AUR.
+alphacephei.com through the AUR. The default model is ~40 MB downloaded,
+Apache licensed.
 
 Any clone path works. Moving the clone breaks the links. Run install again to
 repoint them.
