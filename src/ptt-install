@@ -208,8 +208,8 @@ print_bind_help() {
     local p="${PTT_ROOT/#$HOME/\~}/ptt"
     log_info "No keybind found. Add to the Hyprland config:"
     printf '\n'
-    note "hl.bind(\"F12\", hl.dsp.exec_cmd(\"$p begin\"))"
-    note "hl.bind(\"F12\", hl.dsp.exec_cmd(\"$p end\"), { release = true })"
+    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p begin\"))"
+    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p end\"), { release = true })"
     printf '\n'
     log_info "Then run: hyprctl reload"
 }
