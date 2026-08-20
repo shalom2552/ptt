@@ -54,7 +54,7 @@ require_engine() {
         local hint="${PTT_ROOT/#$HOME/\~}/ptt install"
         log_error "voice typing not installed, run $hint"
         notify_warn "Voice typing not installed" "Run: $hint"
-        exit 0
+        exit 1
     fi
 }
 
@@ -123,7 +123,7 @@ cmd_begin() {
 }
 
 cmd_end() {
-    command -v "$BIN" &>/dev/null || exit 0
+    require_engine
     local cookie=''
     if [[ -e $SESSION ]]; then read -r cookie <"$SESSION" || true; fi
     # A stamped cookie already ended. A missing one is still starting.
