@@ -109,7 +109,7 @@ cmd_begin() {
         fi
     elif [[ -e $prev ]]; then
         # The engine reads its run-on punctuation off the cookie age.
-        cp -p "$prev" "$cookie"
+        touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
     local -a args=("${ARGS[@]}" --cookie "$cookie")
