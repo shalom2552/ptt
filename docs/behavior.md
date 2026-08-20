@@ -1,11 +1,11 @@
-# Findings
+# Behavior
 
-Things learned against the real engine that a ticket got wrong or left open.
+How the engine and the system under it behave, checked against the running
+machine.
 
 ## `--delay-exit` and `--timeout` cannot both apply
 
-Ticket 02 asks for `--delay-exit=0.2` and `--timeout 30` together. Upstream
-gates one behind the other, `/usr/bin/nerd-dictation:1340`:
+Upstream gates one behind the other, `/usr/bin/nerd-dictation:1340`:
 
 ```python
 use_overtime = delay_exit > 0.0 and timeout == 0.0
@@ -23,7 +23,7 @@ Whether 0.2 actually clips the last word on the linked `small-en-us` model is
 still untested. It needs someone at the microphone. If clipping shows up, the
 trade reverses: drop `--timeout` and put `--delay-exit=0.2` back.
 
-## `--timeout 30` may not be the backstop ticket 02 assumes
+## `--timeout 30` may not be the backstop it reads as
 
 A session left in silence ran past 120s without exiting on its own. The timeout
 check sits inside `if data:` in the recording loop, so it only advances while
@@ -34,9 +34,9 @@ Unverified. Confirm by running `begin` with a short `--timeout` and timing it.
 
 ## The AUR pin moved
 
-Ticket 01 records the package as pinned to `aceb2bf` (r156). What installs today
-is `nerd-dictation-git 0.0.r161.41f3727-1`. Both flags above were re-checked
-against the installed file, not against r156.
+The package was pinned to `aceb2bf` (r156). What installs today is
+`nerd-dictation-git 0.0.r161.41f3727-1`. Every line ref here was checked against
+the installed file, not against r156.
 
 ## The cookie file is the whole session state
 
