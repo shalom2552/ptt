@@ -8,7 +8,7 @@ commands=(
     'begin:start dictating'
     'end:stop dictating'
     'install:install the stack, or reconfigure it'
-    'uninstall:remove the packages, model, and symlinks'
+    'uninstall:remove the engine, the models, and the symlinks'
 )
 
 spec=(

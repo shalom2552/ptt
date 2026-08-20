@@ -39,12 +39,21 @@ on key press and key release.
 - Punctuation marks support.
 - Tab completion in zsh and bash.
 
+## Requires
+
+Arch, Hyprland on Wayland, `pacman`, `yay`, `git`, a notification daemon, and a
+microphone.
+
 ## Install
 
 ```
 git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
+
+Install goes to the network three times: a `git fetch` to check the clone for
+updates, an AUR build of the engine, and a vosk model download from
+alphacephei.com through the AUR.
 
 Any clone path works. Moving the clone breaks the links. Run install again to
 repoint them.
@@ -57,7 +66,7 @@ Pass `--step` to see each command and confirm it before it runs:
 
 ## Bind a key
 
-Hyprland, press and release:
+Hyprland 0.55 and later, the lua config, press and release:
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
@@ -72,7 +81,7 @@ Then `hyprctl reload`.
 ptt begin        start dictating
 ptt end          stop dictating
 ptt install      install the stack, or reconfigure it
-ptt uninstall    remove the packages, model, and symlinks
+ptt uninstall    remove the engine, the models, and the symlinks
 
 -s, --step       show each command and confirm it, install and uninstall
 -m, --model      change the speech model, install only
