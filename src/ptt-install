@@ -232,8 +232,12 @@ first_run() {
     install_model "$model_idx"
 
     mkdir -p "${BIN_LINK%/*}"
-    run_or_stop "link ptt onto PATH for terminal use" \
-        ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    if [[ ! -e $BIN_LINK || -L $BIN_LINK ]]; then
+        run_or_stop "link ptt onto PATH for terminal use" \
+            ln -sfn "$PTT_ROOT/ptt" "$BIN_LINK"
+    else
+        log_warn "${BIN_LINK/#$HOME/\~} is a real file, left as it is"
+    fi
     link_completions
 
     heading "ptt installed"
