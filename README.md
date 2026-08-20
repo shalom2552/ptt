@@ -1,28 +1,21 @@
 # ptt
 
-Push to talk voice typing on Linux. Hold a key and speak, and the words are
+Push to talk voice typing on Wayland. Hold a key and speak, and the words are
 typed into whatever window has focus as they are recognized.
 
-Works on Arch with Hyprland and Wayland. Nothing else yet.
-
-MIT, see LICENSE. The tools it installs carry their own terms, below.
-
-## Built on
-
-- [nerd-dictation](https://github.com/ideasman42/nerd-dictation) with
-  [vosk](https://alphacephei.com/vosk/) for offline speech to text. GPL3, and
-  the vosk models are Apache.
-- [wtype](https://github.com/atx/wtype) to type the result into the focused
-  window. MIT.
+Needs Arch, a Wayland compositor, and `yay`.
 
 ## How it works
 
-- The keybind runs `ptt begin` on key press and `ptt end` on key release.
-- nerd-dictation records from the microphone and vosk turns it into text,
-  offline.
-- `src/ptt-config.py` attaches spoken punctuation to the word before it and
-  capitalizes after a sentence ends.
-- wtype types the words into the focused window as you speak.
+ptt is a wrapper. [nerd-dictation](https://github.com/ideasman42/nerd-dictation)
+with [vosk](https://alphacephei.com/vosk/) does the speech,
+[wtype](https://github.com/atx/wtype) does the typing.
+
+- Key press runs `ptt begin`, key release runs `ptt end`.
+- nerd-dictation records the mic, vosk turns the sound into words, offline.
+- `src/ptt-config.py` sticks spoken punctuation onto the word before it, and
+  puts a capital after a sentence ends.
+- wtype types the words into the focused window while you talk.
 
 ## Features
 
@@ -31,11 +24,6 @@ MIT, see LICENSE. The tools it installs carry their own terms, below.
 - Punctuation marks support.
 - Tab completion in zsh and bash.
 
-## Requires
-
-Arch, Hyprland on Wayland, `pacman`, `yay`, `git`, a notification daemon, and a
-microphone.
-
 ## Install
 
 ```
@@ -43,23 +31,11 @@ git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-Install goes to the network three times: a `git fetch` to check the clone for
-updates, an AUR build of the engine, and a vosk model download from
-alphacephei.com through the AUR. The default model is ~40 MB downloaded,
-Apache licensed.
-
-Any clone path works. Moving the clone breaks the links. Run install again to
-repoint them.
-
-Pass `--step` to see each command and confirm it before it runs:
-
-```
-~/.local/share/ptt/ptt install --step
-```
+Moving the project dir breaks the links. Run install again to fix them.
 
 ## Bind a key
 
-Hyprland 0.55 and later, the lua config, press and release:
+Hyprland, press and release:
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
@@ -68,24 +44,7 @@ hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 
 Then `hyprctl reload`.
 
-## First run
-
-Install prints a numbered plan and asks once, then a model menu, then what it
-linked. If nothing in the Hyprland config mentions ptt it prints the bind lines
-above.
-
-The first `ptt begin` shows a listening notification, `ptt end` shows done.
-
-## Troubleshooting
-
-The engine runs detached and writes to `$XDG_RUNTIME_DIR/ptt.log`, one session
-deep. Read it first.
-
-- No audio: nothing is typed and the log has no recognized text. Check the
-  microphone with `wpctl status`.
-- No focused window: `wtype` fails, the engine dies, and `ptt end` reports no
-  session running.
-- Missing model: the engine exits at once. Run `ptt --model` to relink one.
+Other compositors work too. Bind press to `ptt begin`, release to `ptt end`.
 
 ## Usage
 
@@ -103,3 +62,7 @@ ptt uninstall    remove the engine, the models, and the symlinks
 A bare `ptt` prints the help.
 
 Uninstall leaves the clone in place.
+
+## License
+
+MIT, see LICENSE.
