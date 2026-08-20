@@ -27,7 +27,10 @@ prompt_index() {
     hint="1-$count"
     [[ -n $default ]] && hint="$hint, default $((default + 1))"
     while true; do
-        read -rp "$label [$hint]: " reply || reply=''
+        if ! read -rp "$label [$hint]: " reply; then
+            [[ -n $default ]] || return 1
+            reply=''
+        fi
         [[ -z $reply && -n $default ]] && reply=$((default + 1))
         if [[ $reply =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= count)); then
             PICK=$((reply - 1))
