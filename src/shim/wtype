@@ -1,0 +1,19 @@
+#!/bin/sh
+# wtype - shim. wtype builds a virtual keyboard per call and types at once.
+# A window binds the new device asynchronously and drops what beats it there.
+set -eu
+
+SELF="$(readlink -f "$0")"
+
+IFS=':'
+for dir in $PATH; do
+    real="$dir/wtype"
+    if [ -f "$real" ] && [ -x "$real" ] &&
+        [ "$(readlink -f "$real")" != "$SELF" ]; then
+        unset IFS
+        exec "$real" -s 30 -d 5 "$@"
+    fi
+done
+
+printf 'wtype: not found\n' >&2
+exit 127

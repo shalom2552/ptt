@@ -20,6 +20,8 @@ ARGS=(
 )
 # Typing during the hold can eat the key release. Live mode has the watcher.
 DEFER_ARGS=(--defer-output)
+# wtype types before the window has bound its device. The shim settles it.
+SHIM="$PTT_ROOT/src/shim"
 PKGS=(wtype nerd-dictation-git)
 KEYCODE=88 # must match the keybind
 
@@ -121,7 +123,8 @@ cmd_begin() {
     fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
-    setsid -f "$BIN" begin "${args[@]}" >>"$LOG" 2>&1 # detached, outlives this process
+    # Detached, outlives this process.
+    PATH="$SHIM:$PATH" setsid -f "$BIN" begin "${args[@]}" >>"$LOG" 2>&1
     # A release that beats the engine to its cookie leaves end nothing to stop.
     deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)) && ! session_live "$cookie"; do sleep 0.1; done
