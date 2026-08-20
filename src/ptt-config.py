@@ -22,7 +22,9 @@ SENTENCE_END = ".?!\n"
 
 
 def _phrase_lengths(*tables):
-    return sorted({len(phrase.split()) for t in tables for phrase in t}, reverse=True)
+    return sorted(
+        {len(phrase.split()) for t in tables for phrase in t}, reverse=True
+    )
 
 
 def _replace(words):

@@ -1,7 +1,9 @@
 # ui.sh - headings, prompts, plan output, running commands, and help. Uses
 # the colors and log functions from log.sh, which has to be sourced first.
 
-rule() { printf '%s%s%s\n' "$C_DIM" "────────────────────────────────────────────────────────" "$C_RESET"; }
+RULE='────────────────────────────────────────────────────────'
+
+rule() { printf '%s%s%s\n' "$C_DIM" "$RULE" "$C_RESET"; }
 
 heading() {
     printf '\n'

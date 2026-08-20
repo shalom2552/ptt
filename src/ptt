@@ -128,7 +128,8 @@ cmd_end() {
     local cookie=''
     if [[ -e $SESSION ]]; then read -r cookie <"$SESSION" || true; fi
     # A stamped cookie already ended. A missing one is still starting.
-    if [[ -z $cookie ]] || { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
+    if [[ -z $cookie ]] ||
+        { [[ -e $cookie ]] && ! session_live "$cookie"; }; then
         log_warn "no session running"
         return 0
     fi
