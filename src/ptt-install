@@ -177,8 +177,8 @@ choose_model() {
         printf '       %s%s%s\n\n' \
             "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET"
     done
-    note "Sizes are downloads. Speed is CPU bound."
-    note "The big model lags on modest hardware."
+    note "Other languages: https://alphacephei.com/vosk/models"
+    note "Unpack and link it as ${MODEL_LINK/#$HOME/\~}"
     printf '\n'
     prompt_index "${#MODEL_PKGS[@]}" "Model" "$DEFAULT_MODEL"
 }
