@@ -15,6 +15,7 @@ options:
   -h, --help   show this help
 
 examples:
+  ptt begin --toggle
   ptt install
   ptt install --step
   ptt install --model

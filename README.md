@@ -47,6 +47,10 @@ Then `hyprctl reload`.
 
 ## Usage
 
+Hold the bounded key and talk.
+
+To use in a terminal run with the --toggle flag: `ptt begin --toggle`, talk, then `ptt end`.
+
 ```
 ptt begin        start dictating
 ptt end          stop dictating
@@ -58,8 +62,6 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -m, --model      change the speech model, install only
 -h, --help       show this help
 ```
-
-To run in terminal use the `--toggle` flag.
 
 ## Uninstall
 
