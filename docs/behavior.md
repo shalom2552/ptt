@@ -66,6 +66,9 @@ snapshot (`EVIOCGKEY`), and the first of a release event or a state read
 showing one up wins. Reading `/dev/input/event*` needs the `input` group, so
 `src/ptt` refuses to begin without it.
 
+The watch is hold mode only. `ptt begin --toggle` skips it, and the `input`
+group check with it, and stays listening until `ptt end` (`src/ptt:117`).
+
 ## `WTYPE` is a process per call
 
 A new process and a new keymap on every call (279), `-d` defaults to 0. A

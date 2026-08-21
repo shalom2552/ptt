@@ -17,6 +17,9 @@ _ptt() {
     if [[ -n $cmd ]]; then
         opts="$opts -s --step"
     fi
+    if [[ $cmd == begin ]]; then
+        opts="$opts -t --toggle"
+    fi
     mapfile -t COMPREPLY < <(compgen -W "$cmds $opts" -- "$cur")
 }
 complete -F _ptt ptt

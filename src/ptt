@@ -114,7 +114,10 @@ watch_release() {
 
 cmd_begin() {
     require_engine
-    require_watch
+    if ((!TOGGLE)); then
+        require_watch
+        [[ -t 1 ]] && log_warn "no key held, this ends at once, use --toggle"
+    fi
     local prev='' cookie deadline
     [[ -e $SESSION ]] && read -r prev <"$SESSION"
     cookie="$RUN/ptt.cookie.$$"
@@ -137,7 +140,8 @@ cmd_begin() {
         touch -r "$prev" "$cookie"
     fi
     rm -f "$cookie.stop" # a recycled pid must not inherit a release
-    watch_release "$cookie" & # armed while the key is still down
+    # armed while the key is still down
+    if ((!TOGGLE)); then watch_release "$cookie" & fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
     : >"$LOG" # one session deep, so a failure is the one just seen
@@ -175,6 +179,8 @@ MODEL=0
 MODEL_ARG=''
 STEP=0
 STEP_ARG=''
+TOGGLE=0
+TOGGLE_ARG=''
 for a in "$@"; do
     case "$a" in
         -h | --help)
@@ -189,6 +195,10 @@ for a in "$@"; do
             MODEL=1
             MODEL_ARG="$a"
             ;;
+        -t | --toggle)
+            TOGGLE=1
+            TOGGLE_ARG="$a"
+            ;;
         begin | end | install | uninstall)
             if [[ -n $CMD ]]; then bad_arg ptt "$a"; fi
             CMD="$a"
@@ -198,19 +208,12 @@ for a in "$@"; do
 done
 
 # A flag may come before its command, so this waits for the whole line.
-if ((MODEL)); then
-    if [[ -z $CMD ]]; then
-        CMD=install
-    elif [[ $CMD != install ]]; then
-        bad_arg ptt "$MODEL_ARG"
-    fi
-fi
-if ((STEP)); then
-    case "$CMD" in
-        install | uninstall) export PTT_STEP=1 ;;
-        *) bad_arg ptt "$STEP_ARG" ;;
-    esac
-fi
+if ((MODEL)) && [[ -z $CMD ]]; then CMD=install; fi
+if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt "$MODEL_ARG"; fi
+# *install is install and uninstall.
+if ((STEP)) && [[ $CMD != *install ]]; then bad_arg ptt "$STEP_ARG"; fi
+if ((STEP)); then export PTT_STEP=1; fi
+if ((TOGGLE)) && [[ $CMD != begin ]]; then bad_arg ptt "$TOGGLE_ARG"; fi
 
 case "$CMD" in
     begin) cmd_begin ;;
