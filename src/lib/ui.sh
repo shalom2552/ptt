@@ -26,10 +26,10 @@ confirm() {
 PICK=0
 prompt_index() {
     local count="$1" label="$2" default="${3:-}" reply hint
-    hint="1-$count"
-    [[ -n $default ]] && hint="$hint, default $((default + 1))"
+    hint="(1-$count)"
+    [[ -n $default ]] && hint="$hint [$((default + 1))]"
     while true; do
-        if ! read -rp "$label [$hint]: " reply; then
+        if ! read -rp "$label $hint: " reply; then
             [[ -n $default ]] || return 1
             reply=''
         fi
@@ -59,7 +59,7 @@ plan_step_note() {
 }
 
 # Result block. A label column and a value, under a heading, no level prefix.
-FIELD_W=10
+FIELD_W=16
 
 # The third argument is a dim tail on the value, for what the value means.
 field() {
