@@ -15,8 +15,7 @@ with [vosk](https://alphacephei.com/vosk/) does the speech,
 
 - Key press runs `ptt begin`, and `src/ptt-keywatch` ends it on the release.
 - nerd-dictation records the mic, vosk turns the sound into words, offline.
-- `src/ptt-config.py` sticks spoken punctuation onto the word before it, and
-  puts a capital after a sentence ends.
+- `src/ptt-config.py` processes punctuation and capitals on the fly.
 - wtype types the words into the focused window while you talk.
 
 ## Features
@@ -34,9 +33,7 @@ Needs python and `yay`.
 curl -fsSL shalom2552.github.io/ptt/install.sh | bash
 ```
 
-Clones into `~/.local/share/ptt`, then runs the install.
-
-> If ever moved, links break, just run install again.
+Clones into `~/.local/share/ptt` and runs the installer.
 
 ## Bind a key
 
@@ -46,15 +43,11 @@ Set under Hyprland config:
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
 ```
 
-Then `hyprctl reload`.
-
 > Other compositors work too. Just bind `ptt begin` to a key.
 
 ## Usage
 
 Hold the bounded key and talk.
-
-To use in a terminal run with the --toggle flag: `ptt begin --toggle`, talk, then `ptt end`.
 
 ```
 ptt begin        start dictating
@@ -67,6 +60,8 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -m, --model      change the speech model, install only
 -h, --help       show this help
 ```
+
+Terminal: run with `--toggle` flag: `ptt begin --toggle`, talk, then `ptt end`.
 
 ## Other languages
 
@@ -81,14 +76,12 @@ ln -sfn ~/.local/share/<model-name> ~/.config/nerd-dictation/model
 
 ## Uninstall
 
-Uninstall removes the dependencies, engine, models and all symlinks.
-
 ```bash
 ptt uninstall
 ```
 
-> Uninstall leaves the clone in place.
+Uninstall removes the dependencies, engine, models and all symlinks.
 
 ## License
 
-MIT, see LICENSE.
+MIT, see [LICENSE](LICENSE).
