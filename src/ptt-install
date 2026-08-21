@@ -304,11 +304,12 @@ menu_installed() {
 
     local -a labels=() actions=()
     labels+=("change model") actions+=(change_model)
+    labels+=("uninstall") actions+=(cmd_uninstall)
     labels+=("quit") actions+=(:)
 
-    heading "ptt is installed"
+    heading "already installed"
     printf '\n'
-    field model "$dir ($ver)" "$label"
+    field "current model:" "$dir ($ver)" "$label"
     printf '\n'
     local i
     for i in "${!labels[@]}"; do
@@ -413,7 +414,10 @@ offer_update() {
     local count
     count=$(git -C "$PTT_ROOT" rev-list --count HEAD..@{u} 2>/dev/null) ||
         return 0
-    ((count)) || return 0
+    if ((count == 0)); then
+        log_info "Already up to date."
+        return 0
+    fi
 
     heading "Update available"
     plan_title "What's new:"
