@@ -3,6 +3,10 @@
 Push to talk voice typing for Arch on Wayland. Hold a key and speak, and the
 words are typed live at the cursor, in whatever window has focus.
 
+|  |
+| :-: |
+| ![demo](share/demo.gif) |
+
 ## How it works
 
 ptt is a wrapper. [nerd-dictation](https://github.com/ideasman42/nerd-dictation)
