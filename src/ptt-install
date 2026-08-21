@@ -414,7 +414,10 @@ offer_update() {
     local count
     count=$(git -C "$PTT_ROOT" rev-list --count HEAD..@{u} 2>/dev/null) ||
         return 0
-    ((count)) || return 0
+    if ((count == 0)); then
+        log_info "Already up to date."
+        return 0
+    fi
 
     heading "Update available"
     plan_title "What's new:"
