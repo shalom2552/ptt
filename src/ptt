@@ -30,7 +30,7 @@ notify_warn() { notify "critical" 10000 "$1" "$2"; }
 
 say_state() {
     local timeout=$1 text=$2
-    printf '%s\n' "$text"
+    log_info "$text"
     notify "normal" "$timeout" ptt "$text"
 }
 
@@ -115,8 +115,12 @@ watch_release() {
 cmd_begin() {
     require_engine
     if ((!TOGGLE)); then
+        # A terminal means no key is down.
+        if [[ -t 1 ]]; then
+            log_warn "no key found, run with --toggle"
+            exit 0
+        fi
         require_watch
-        [[ -t 1 ]] && log_warn "no key held, this ends at once, use --toggle"
     fi
     local prev='' cookie deadline
     [[ -e $SESSION ]] && read -r prev <"$SESSION"
@@ -144,6 +148,7 @@ cmd_begin() {
     if ((!TOGGLE)); then watch_release "$cookie" & fi
     printf '%s\n' "$cookie" >"$SESSION"
     say_state 30000 listening
+    if ((TOGGLE)); then log_info "stop with 'ptt end'"; fi
     : >"$LOG" # one session deep, so a failure is the one just seen
     # Detached, so the engine outlives this process.
     setsid -f "$BIN" begin "${ARGS[@]}" --cookie "$cookie" >>"$LOG" 2>&1
