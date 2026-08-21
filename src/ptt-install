@@ -160,18 +160,21 @@ offer_links() {
 }
 
 choose_model() {
-    local i label
+    local i label mark cur=-1
+    cur="$(model_index_for_dir "$(current_model_dir)")" || cur=-1
     heading "Choose a model"
     printf '\n'
     for i in "${!MODEL_PKGS[@]}"; do
         label="$C_DIM${MODEL_LABELS[i]}"
         if ((i == DEFAULT_MODEL)); then
-            label+=", $C_RESET${C_ARG}default"
+            label+="$C_RESET $C_NUM(default)"
         fi
-        printf '  %d) %-24s %-5s %-8s %s%s\n' \
-            "$((i + 1))" "${MODEL_PKGS[i]}" "${MODEL_VERS[i]}" \
+        mark=' '
+        if ((i == cur)); then mark="$C_ARG*$C_RESET"; fi
+        printf '  %s %d) %-24s %-5s %-8s %s%s\n' \
+            "$mark" "$((i + 1))" "${MODEL_PKGS[i]}" "${MODEL_VERS[i]}" \
             "${MODEL_SIZES[i]}" "$label" "$C_RESET"
-        printf '     %s%s%s\n\n' \
+        printf '       %s%s%s\n\n' \
             "$C_DIM" "$MODEL_ROOT/${MODEL_DIRS[i]}" "$C_RESET"
     done
     note "Sizes are downloads. Speed is CPU bound."
