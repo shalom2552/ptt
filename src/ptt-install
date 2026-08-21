@@ -414,10 +414,10 @@ offer_update() {
     ((count)) || return 0
 
     heading "Update available"
-    plan_title "New commits:"
-    git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
+    plan_title "What's new:"
+    git -C "$PTT_ROOT" --no-pager log --no-merges -n 20 \
+        --format='%C(auto)%h%d %s%n' HEAD..@{u} ||
         return 0
-    printf '\n'
     # Untracked files never block a rebase, tracked changes do.
     if [[ -n "$(git -C "$PTT_ROOT" status --porcelain -uno)" ]]; then
         log_warn "The clone has local changes. Update skipped."
