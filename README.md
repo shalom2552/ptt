@@ -26,20 +26,16 @@ with [vosk](https://alphacephei.com/vosk/) does the speech,
 
 Needs python and `yay`.
 
-1. Clone it and run the installer:
-
-```
-git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
-~/.local/share/ptt/ptt install
+```bash
+git clone https://github.com/shalom2552/ptt.git && cd ptt
+./ptt install
 ```
 
-2. Log out and back in, for the `input` group.
-
-> If the project dir moves, the links break. Run install again to fix them.
+> If ever moved, links break, just run install again.
 
 ## Bind a key
 
-Hyprland, press only. ptt reads the release off the input devices.
+Set under Hyprland config:
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
@@ -47,7 +43,7 @@ hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
 
 Then `hyprctl reload`.
 
-Other compositors work too. Bind `ptt begin` to a key.
+> Other compositors work too. Just bind `ptt begin` to a key.
 
 ## Usage
 
@@ -57,12 +53,23 @@ ptt end          stop dictating
 ptt install      install the stack, or reconfigure it
 ptt uninstall    remove the engine, the models, and the symlinks
 
+-t, --toggle     keep listening until ptt end, begin only
 -s, --step       show each command and confirm it, install and uninstall
 -m, --model      change the speech model, install only
 -h, --help       show this help
 ```
 
-Uninstall leaves the clone in place.
+To run in terminal use the `--toggle` flag.
+
+## Uninstall
+
+Uninstall removes the engine, model and all symlinks.
+
+```bash
+ptt uninstall
+```
+
+> Uninstall leaves the clone in place.
 
 ## License
 
