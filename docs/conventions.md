@@ -85,6 +85,6 @@ trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 ## Models
 
-Menu lists models smallest first, defaults to the smallest,
-`vosk-model-small-en-us` 0.15 at ~40 MB. A 1.8 GB download is a poor thing to
-hand someone by pressing enter.
+Install takes the smallest model, `vosk-model-small-en-us` 0.15 at ~40 MB, with
+no prompt. `ptt install --model` lists them smallest first. A 1.8 GB download is
+a poor thing to hand someone by pressing enter.
