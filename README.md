@@ -1,9 +1,7 @@
 # ptt
 
-Push to talk voice typing on Wayland. Hold a key and speak, and the words are
-typed into whatever window has focus as they are recognized.
-
-Needs Arch, a Wayland compositor, python, and `yay`.
+Push to talk voice typing for Arch on Wayland. Hold a key and speak, and the
+words are typed live at the cursor, in whatever window has focus.
 
 ## How it works
 
@@ -26,14 +24,18 @@ with [vosk](https://alphacephei.com/vosk/) does the speech,
 
 ## Install
 
+Needs python and `yay`.
+
+1. Clone it and run the installer:
+
 ```
 git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-Moving the project dir breaks the links. Run install again to fix them.
+2. Log out and back in, for the `input` group.
 
-Install joins the `input` group. Log out and back in for it to apply.
+> If the project dir moves, the links break. Run install again to fix them.
 
 ## Bind a key
 
@@ -45,7 +47,7 @@ hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
 
 Then `hyprctl reload`.
 
-Other compositors work too. Bind press to `ptt begin`.
+Other compositors work too. Bind `ptt begin` to a key.
 
 ## Usage
 
@@ -59,8 +61,6 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -m, --model      change the speech model, install only
 -h, --help       show this help
 ```
-
-A bare `ptt` prints the help.
 
 Uninstall leaves the clone in place.
 
