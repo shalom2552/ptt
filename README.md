@@ -68,9 +68,20 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -h, --help       show this help
 ```
 
+## Other languages
+
+This ships English only. Any [vosk model](https://alphacephei.com/vosk/models)
+works, just point the link at it:
+
+```bash
+curl -L -o /tmp/vosk.zip <model-url>
+unzip /tmp/vosk.zip -d ~/.local/share
+ln -sfn ~/.local/share/<model-name> ~/.config/nerd-dictation/model
+```
+
 ## Uninstall
 
-Uninstall removes the engine, model and all symlinks.
+Uninstall removes the dependencies, engine, models and all symlinks.
 
 ```bash
 ptt uninstall
