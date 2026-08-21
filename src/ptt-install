@@ -390,8 +390,9 @@ uninstall_run() {
                     sudo rm -f "${COMP_LINKS[i]}" || true
                 ;;
             runtime)
+                # Unglobbed, so the announce stays one line.
                 run_cmd "remove the cookies, locks, log, and session pointer" \
-                    rm -f "$XDG_RUNTIME_DIR"/ptt.* || true
+                    sh -c "rm -f $XDG_RUNTIME_DIR/ptt.*" || true
                 ;;
             group)
                 run_cmd "leave the input group" \
