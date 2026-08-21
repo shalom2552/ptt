@@ -40,7 +40,7 @@ Print only what applies. Nothing about a thing that is not there.
 2. Each command announced on one line as it runs.
 
 Mechanics go quiet. A mechanic is a step the plan covered: a package install,
-a symlink.
+a symlink, a group.
 
 `-s` / `--step` confirms the mechanics too, so nothing runs unseen:
 

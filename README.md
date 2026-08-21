@@ -1,9 +1,7 @@
 # ptt
 
-Push to talk voice typing on Wayland. Hold a key and speak, and the words are
-typed into whatever window has focus as they are recognized.
-
-Needs Arch, a Wayland compositor, and `yay`.
+Push to talk voice typing for Arch on Wayland. Hold a key and speak, and the
+words are typed live at the cursor, in whatever window has focus.
 
 ## How it works
 
@@ -11,7 +9,7 @@ ptt is a wrapper. [nerd-dictation](https://github.com/ideasman42/nerd-dictation)
 with [vosk](https://alphacephei.com/vosk/) does the speech,
 [wtype](https://github.com/atx/wtype) does the typing.
 
-- Key press runs `ptt begin`, key release runs `ptt end`.
+- Key press runs `ptt begin`, and `src/ptt-keywatch` ends it on the release.
 - nerd-dictation records the mic, vosk turns the sound into words, offline.
 - `src/ptt-config.py` sticks spoken punctuation onto the word before it, and
   puts a capital after a sentence ends.
@@ -26,25 +24,30 @@ with [vosk](https://alphacephei.com/vosk/) does the speech,
 
 ## Install
 
+Needs python and `yay`.
+
+1. Clone it and run the installer:
+
 ```
 git clone git@github.com:shalom2552/ptt.git ~/.local/share/ptt
 ~/.local/share/ptt/ptt install
 ```
 
-Moving the project dir breaks the links. Run install again to fix them.
+2. Log out and back in, for the `input` group.
+
+> If the project dir moves, the links break. Run install again to fix them.
 
 ## Bind a key
 
-Hyprland, press and release:
+Hyprland, press only. ptt reads the release off the input devices.
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd("ptt begin"))
-hl.bind("Pause", hl.dsp.exec_cmd("ptt end"), { release = true })
 ```
 
 Then `hyprctl reload`.
 
-Other compositors work too. Bind press to `ptt begin`, release to `ptt end`.
+Other compositors work too. Bind `ptt begin` to a key.
 
 ## Usage
 
@@ -58,8 +61,6 @@ ptt uninstall    remove the engine, the models, and the symlinks
 -m, --model      change the speech model, install only
 -h, --help       show this help
 ```
-
-A bare `ptt` prints the help.
 
 Uninstall leaves the clone in place.
 

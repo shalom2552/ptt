@@ -15,6 +15,7 @@ BIN_LINK="$HOME/.local/bin/ptt"
 MODEL_LINK="$ND_CONFIG/model"
 MODEL_ROOT="/usr/share/vosk-models"
 HYPR_DIR="$HOME/.config/hypr"
+USER_NAME="${USER:-$(id -un)}"
 
 # A shell that is not installed has no link directory.
 COMP_SHELLS=(zsh bash)
@@ -40,6 +41,15 @@ DEFAULT_MODEL=0
 trap 'log_error "failed on line $LINENO: $BASH_COMMAND"' ERR
 
 pkg_installed() { pacman -Qq "$1" &>/dev/null; }
+
+# The group database, not this session's credentials.
+group_in_db() {
+    getent group input 2>/dev/null |
+        cut -d: -f4 | tr ',' '\n' | grep -qx "$USER_NAME"
+}
+
+# What this session has. Only set at login, so it can lag the database.
+group_in_session() { id -nG | tr ' ' '\n' | grep -qx input; }
 
 is_installed() {
     command -v "$ND_BIN" &>/dev/null && [[ -L $MODEL_LINK ]]
@@ -181,6 +191,11 @@ install_model() {
     log_info "model: ${MODEL_DIRS[i]} (${MODEL_VERS[i]}) linked at $link"
 }
 
+join_group() {
+    run_or_stop "join the input group, ptt reads the key state" \
+        sudo gpasswd -a "$USER_NAME" input
+}
+
 print_plan() {
     local n=0 i dir
     plan_title "ptt install will:"
@@ -196,6 +211,10 @@ print_plan() {
         plan_line "$((++n))" \
             "link the ${COMP_SHELLS[i]} completion into $(arg "$dir")"
     done
+    if ! group_in_db; then
+        plan_line "$((++n))" \
+            "join the $(arg input) group, so ptt sees the key release"
+    fi
     printf '\n'
     plan_step_note
 }
@@ -211,7 +230,6 @@ print_bind_help() {
     log_info "No keybind found. Add to the Hyprland config:"
     printf '\n'
     note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p begin\"))"
-    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p end\"), { release = true })"
     printf '\n'
     log_info "Then run: hyprctl reload"
 }
@@ -246,6 +264,8 @@ first_run() {
     fi
     link_completions
 
+    if ! group_in_db; then join_group; fi
+
     heading "ptt installed"
     printf '\n'
     field packages "${REPO_PKGS[*]} ${AUR_PKGS[*]}"
@@ -253,6 +273,10 @@ first_run() {
         "${MODEL_LABELS[model_idx]}"
     field ptt "${BIN_LINK/#$HOME/\~}"
     printf '\n'
+    if ! group_in_session; then
+        note "Log out and back in for the input group to apply."
+        printf '\n'
+    fi
     print_bind_help
 }
 
@@ -312,6 +336,7 @@ uninstall_todo() {
     done
     [[ -n ${XDG_RUNTIME_DIR:-} ]] &&
         compgen -G "$XDG_RUNTIME_DIR/ptt.*" >/dev/null && RM_TODO+=(runtime)
+    if group_in_db; then RM_TODO+=(group); fi
     : # a false last test must not return 1 into set -e
 }
 
@@ -335,6 +360,7 @@ uninstall_plan() {
                 plan_line "$((++n))" \
                     "remove $(arg "$XDG_RUNTIME_DIR/ptt.*"), the session files"
                 ;;
+            group) plan_line "$((++n))" "leave the $(arg input) group" ;;
         esac
     done
     printf '\n'
@@ -364,8 +390,14 @@ uninstall_run() {
                     sudo rm -f "${COMP_LINKS[i]}" || true
                 ;;
             runtime)
+                # Unglobbed, so the announce stays one line.
                 run_cmd "remove the cookies, locks, log, and session pointer" \
-                    rm -f "$XDG_RUNTIME_DIR"/ptt.* || true
+                    sh -c "rm -f $XDG_RUNTIME_DIR/ptt.*" || true
+                ;;
+            group)
+                run_cmd "leave the input group" \
+                    sudo gpasswd -d "$USER_NAME" input || continue
+                log_info "Log out and back in to clear it from this session."
                 ;;
         esac
     done

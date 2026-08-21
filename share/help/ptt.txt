@@ -19,4 +19,4 @@ examples:
   ptt install --model
   ptt uninstall
 
-begin and end are called by a keybind. install and uninstall are run by hand.
+begin is called by a keybind. install and uninstall are run by hand.
