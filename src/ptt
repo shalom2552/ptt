@@ -198,19 +198,11 @@ for a in "$@"; do
 done
 
 # A flag may come before its command, so this waits for the whole line.
-if ((MODEL)); then
-    if [[ -z $CMD ]]; then
-        CMD=install
-    elif [[ $CMD != install ]]; then
-        bad_arg ptt "$MODEL_ARG"
-    fi
-fi
-if ((STEP)); then
-    case "$CMD" in
-        install | uninstall) export PTT_STEP=1 ;;
-        *) bad_arg ptt "$STEP_ARG" ;;
-    esac
-fi
+if ((MODEL)) && [[ -z $CMD ]]; then CMD=install; fi
+if ((MODEL)) && [[ $CMD != install ]]; then bad_arg ptt "$MODEL_ARG"; fi
+# *install is install and uninstall.
+if ((STEP)) && [[ $CMD != *install ]]; then bad_arg ptt "$STEP_ARG"; fi
+if ((STEP)); then export PTT_STEP=1; fi
 
 case "$CMD" in
     begin) cmd_begin ;;
