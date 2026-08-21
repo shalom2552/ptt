@@ -356,10 +356,9 @@ uninstall_plan() {
                 plan_line "$((++n))" "remove $(arg "${COMP_LINKS[i]}")"
                 ;;
             runtime)
-                plan_line "$((++n))" \
-                    "remove $(arg "$XDG_RUNTIME_DIR/ptt.*"), the session files"
+                plan_line "$((++n))" "remove $(arg "$XDG_RUNTIME_DIR/ptt.*")"
                 ;;
-            group) plan_line "$((++n))" "leave the $(arg input) group" ;;
+            group) plan_line "$((++n))" "ask to leave the $(arg input) group" ;;
         esac
     done
     printf '\n'
@@ -394,7 +393,7 @@ uninstall_run() {
                     sh -c "rm -f $XDG_RUNTIME_DIR/ptt.*" || true
                 ;;
             group)
-                run_cmd "leave the input group" \
+                ask_cmd "leave the input group" \
                     sudo gpasswd -d "$USER_NAME" input || continue
                 log_info "Log out and back in to clear it from this session."
                 ;;
@@ -415,10 +414,10 @@ offer_update() {
     ((count)) || return 0
 
     heading "Update available"
-    plan_title "New commits:"
-    git -C "$PTT_ROOT" --no-pager log --oneline --no-merges -n 20 HEAD..@{u} ||
+    plan_title "What's new:"
+    git -C "$PTT_ROOT" --no-pager log --no-merges -n 20 \
+        --format='%C(auto)%h%d %s%n' HEAD..@{u} ||
         return 0
-    printf '\n'
     # Untracked files never block a rebase, tracked changes do.
     if [[ -n "$(git -C "$PTT_ROOT" status --porcelain -uno)" ]]; then
         log_warn "The clone has local changes. Update skipped."
