@@ -415,7 +415,7 @@ offer_update() {
     heading "Update available"
     plan_title "What's new:"
     git -C "$PTT_ROOT" --no-pager log --no-merges -n 20 \
-        --format='%C(auto)%h%d %s%n' HEAD..@{u} ||
+        --decorate-refs=refs/heads --format='%C(auto)%h%d %s%n' HEAD..@{u} ||
         return 0
     # Untracked files never block a rebase, tracked changes do.
     if [[ -n "$(git -C "$PTT_ROOT" status --porcelain -uno)" ]]; then
