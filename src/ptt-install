@@ -226,10 +226,9 @@ print_bind_help() {
         return
     fi
     grep -rq ptt "$HYPR_DIR" 2>/dev/null && return
-    local p="${PTT_ROOT/#$HOME/\~}/ptt"
     log_info "No keybind found. Add to the Hyprland config:"
     printf '\n'
-    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"$p begin\"))"
+    note "hl.bind(\"Pause\", hl.dsp.exec_cmd(\"ptt begin\"))"
     printf '\n'
     log_info "Then run: hyprctl reload"
 }
