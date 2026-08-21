@@ -22,6 +22,9 @@ fi
 if (( ${words[(I)install]} || ${words[(I)uninstall]} )); then
     spec+=('(-s --step)'{-s,--step}"$step")
 fi
+if (( ${words[(I)begin]} )); then
+    spec+=('(-t --toggle)'{-t,--toggle}'[keep listening until ptt end]')
+fi
 
 _arguments -s "${spec[@]}"
 
