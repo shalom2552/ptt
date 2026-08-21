@@ -27,9 +27,10 @@ with [vosk](https://alphacephei.com/vosk/) does the speech,
 Needs python and `yay`.
 
 ```bash
-git clone https://github.com/shalom2552/ptt.git && cd ptt
-./ptt install
+curl -fsSL shalom2552.github.io/ptt/install.sh | bash
 ```
+
+Clones into `~/.local/share/ptt`, then runs the install.
 
 > If ever moved, links break, just run install again.
 
