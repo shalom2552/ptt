@@ -16,6 +16,6 @@ else
 fi
 
 # Tagged [ptt] so output never reads as pacman's. The level survives a pipe.
-log_info() { printf '%s[ptt] INFO ==>%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
-log_warn() { printf '%s[ptt] WARN ==>%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
-log_error() { printf '%s[ptt] ERR  ==>%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }
+log_info() { printf '%s[ptt]%s %s\n' "$C_PTT" "$C_RESET" "$*"; }
+log_warn() { printf '%s[ptt]%s %s\n' "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s[ptt]%s %s\n' "$C_ERROR" "$C_RESET" "$*" >&2; }

@@ -9,15 +9,10 @@ Name the thing, not the person: "unlink ptt from PATH", not "unlink your ptt".
 
 ## Output
 
-Every printed line carries a level, so output never reads as pacman's:
+Every printed line carries the tag, so output never reads as pacman's. Color
+carries the level.
 
-```
-[ptt] INFO ==> text
-[ptt] WARN ==> text
-[ptt] ERR  ==> text
-```
-
-Headings are the exception: the tag, no level, dim rules around it.
+Headings are the exception: dim rules around the tag.
 
 ```
 ────────────────────────────────────────────────────────
