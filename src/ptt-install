@@ -202,7 +202,7 @@ print_plan() {
     plan_line "$((++n))" \
         "install $(arg "${REPO_PKGS[*]}") from the official repos"
     plan_line "$((++n))" "install $(arg "${AUR_PKGS[*]}") from the AUR"
-    plan_line "$((++n))" "install a vosk model, picked from a menu"
+    plan_line "$((++n))" "install the ${MODEL_DIRS[DEFAULT_MODEL]} model"
     plan_line "$((++n))" "point $(arg "${MODEL_LINK/#$HOME/\~}") at that model"
     plan_line "$((++n))" "link ptt onto PATH at $(arg "${BIN_LINK/#$HOME/\~}")"
     for i in "${!COMP_SHELLS[@]}"; do
@@ -250,8 +250,7 @@ first_run() {
     run_or_stop "build ${AUR_PKGS[*]} from the AUR, the speech engine" \
         yay -S --needed --noconfirm "${AUR_PKGS[@]}"
 
-    choose_model
-    local model_idx="$PICK"
+    local model_idx="$DEFAULT_MODEL"
     install_model "$model_idx"
 
     mkdir -p "${BIN_LINK%/*}"
