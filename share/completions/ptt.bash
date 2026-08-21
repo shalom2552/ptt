@@ -10,10 +10,11 @@ _ptt() {
             break
         fi
     done
-    # --model belongs to install alone, --step to install and uninstall.
-    if [[ $cmd == install ]]; then
-        opts="$opts -m --model -s --step"
-    elif [[ $cmd == uninstall ]]; then
+    # --model is not for uninstall, --step is for install and uninstall.
+    if [[ $cmd != uninstall ]]; then
+        opts="$opts -m --model"
+    fi
+    if [[ -n $cmd ]]; then
         opts="$opts -s --step"
     fi
     mapfile -t COMPREPLY < <(compgen -W "$cmds $opts" -- "$cur")

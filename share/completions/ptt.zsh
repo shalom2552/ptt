@@ -15,8 +15,8 @@ spec=(
     '(-h --help)'{-h,--help}'[show this help]'
     '1: :->command'
 )
-# --model belongs to install alone, --step to install and uninstall.
-if (( ${words[(I)install]} )); then
+# --model is not for uninstall, --step is for install and uninstall.
+if (( ! ${words[(I)uninstall]} )); then
     spec+=('(-m --model)'{-m,--model}'[change the speech model]')
 fi
 if (( ${words[(I)install]} || ${words[(I)uninstall]} )); then
