@@ -9,6 +9,7 @@ commands:
   uninstall    remove the engine, the models, and the symlinks
 
 options:
+  -t, --toggle keep listening until ptt end, begin only
   -s, --step   show each command and confirm it, install and uninstall
   -m, --model  change the speech model, install only
   -h, --help   show this help
