@@ -10,7 +10,7 @@ has focus. Fully offline.
   Whisper `large-v3-turbo` on the GPU, so a press starts recording at once.
 - It reads the key straight from `/dev/input`, so any window works.
 - While the key is held it transcribes about every 0.5 s and types with
-  `wtype`. On release it runs one last, more accurate pass.
+  `wtype`. On release one last pass types the words still missing at the end.
 - Two typing modes:
   - `correct`: types the current guess right away, fixes it with backspaces.
   - `commit`: types a word once passes agree, never deletes, 1 to 2 s behind.
@@ -57,7 +57,7 @@ hl.bind("Pause", hl.dsp.exec_cmd("true"))
 
 ## Usage
 
-Hold Pause and talk. Release to finish.
+Hold Pause and talk. Release to finish. Any other key or a click stops it.
 
 - Settings: `~/.config/ptt/config.toml`, every option explained inside.
 - Words to expect, like names and jargon: `~/.config/ptt/words.txt`.

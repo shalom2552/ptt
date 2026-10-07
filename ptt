@@ -19,6 +19,10 @@ if LIBS and LIBS[0] not in os.environ.get("LD_LIBRARY_PATH", ""):
     os.environ["LD_LIBRARY_PATH"] = ":".join(LIBS + [os.environ.get("LD_LIBRARY_PATH", "")])
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
+libc = ctypes.CDLL("libc.so.6")
+libc.prctl(15, b"ptt", 0, 0, 0)  # PR_SET_NAME, so btop and ps show ptt, not python
+os.environ["OPENBLAS_NUM_THREADS"] = "1"  # numpy's extra BLAS threads spin a core after each pass, no speedup
+
 import evdev
 import numpy as np
 from faster_whisper import WhisperModel
@@ -37,6 +41,7 @@ CONFIG = {
     "trim_at": 20,
     "max_hold": 120,
     "skip_silence": True,
+    "stop_on_input": True,
     "osd": True,
     "osd_icon": "audio-input-microphone-symbolic",
     "osd_text": "Listening",
@@ -48,19 +53,33 @@ CONFIG = {
     "sound_stop": "/usr/share/sounds/freedesktop/stereo/device-removed.oga",
     "sound_volume": 0.5,
     "commit": {"agree": 2},
-    "correct": {"lock": 0},
+    "correct": {"lock": 0, "keep_on_release": True},
 }
+
+
+def die(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(2)  # the service does not restart on 2
+
+
 CONFIG_PATH = os.path.expanduser("~/.config/ptt/config.toml")
 if os.path.exists(CONFIG_PATH):
-    with open(CONFIG_PATH, "rb") as f:
-        for k, v in tomllib.load(f).items():
+    try:
+        with open(CONFIG_PATH, "rb") as f:
+            user = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        die(f"{CONFIG_PATH}: {e}")
+    for k, v in user.items():
+        if k not in CONFIG:
+            print(f"unknown setting ignored: {k}", flush=True)
+        else:
             CONFIG[k] = CONFIG[k] | v if isinstance(v, dict) else v
 
 WORDS_PATH = os.path.expanduser("~/.config/ptt/words.txt")
 WORDS = []
 if os.path.exists(WORDS_PATH):
     with open(WORDS_PATH) as f:
-        WORDS = [w.strip() for w in f if w.strip() and not w.startswith("#")]
+        WORDS = [w for w in map(str.strip, f) if w and not w.startswith("#")]
 # a sentence keeps Whisper's capitals and punctuation; a bare word list makes it drop them
 HOTWORDS = "Glossary: " + ", ".join(WORDS) + "." if WORDS else None
 
@@ -68,22 +87,31 @@ RATE = 16000
 STEP = CONFIG["step"]
 TRIM_AT = CONFIG["trim_at"]
 MAX_HOLD = CONFIG["max_hold"]
-KEY = evdev.ecodes.ecodes[CONFIG["key"]]
+KEY = evdev.ecodes.ecodes.get(CONFIG["key"])
+if KEY is None:
+    die(f"unknown key: {CONFIG['key']}")
 EV_KEY = evdev.ecodes.EV_KEY
+# mouse buttons too, so a click stops the dictation
+WATCH = {KEY, evdev.ecodes.BTN_LEFT} if CONFIG["stop_on_input"] else {KEY}
 
-try:
-    model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"], local_files_only=True)
-except FileNotFoundError:
-    print(f"downloading the {CONFIG['model']} model", flush=True)
-    model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"])
-list(model.transcribe(np.zeros(RATE, np.float32), language="en")[0])
-get_speech_timestamps(np.zeros(RATE, np.float32))
-libc = ctypes.CDLL("libc.so.6")
-libc.malloc_trim(0)  # loading leaves ~800 MB of freed heap that glibc keeps
+model = None
 turn = threading.Lock()  # one session transcribes and types at a time, in press order
 
 
-def transcribe(audio, prompt, final):
+def load_model():
+    global model
+    try:
+        model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"], local_files_only=True)
+    except FileNotFoundError:
+        print(f"downloading the {CONFIG['model']} model", flush=True)
+        model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"])
+    list(model.transcribe(np.zeros(RATE, np.float32), language="en")[0])
+    get_speech_timestamps(np.zeros(RATE, np.float32))
+    libc.malloc_trim(0)  # loading leaves ~800 MB of freed heap that glibc keeps
+
+
+def transcribe(audio, prompt, final, timed=False, hotwords=HOTWORDS):
+    """Words and, if timed, their (start, end) times; None for a pass that echoed the glossary or looped."""
     if len(audio) < CONFIG["min_audio"] * RATE:
         return [], []
     t = time.monotonic()
@@ -92,16 +120,24 @@ def transcribe(audio, prompt, final):
         language="en",
         beam_size=CONFIG["final_beam"] if final else CONFIG["live_beam"],
         initial_prompt=prompt or None,
-        hotwords=HOTWORDS,
+        hotwords=hotwords,
         condition_on_previous_text=False,
         vad_filter=True,
+        temperature=0.0,  # the default retries at higher temperatures take 2-4 s and give random text
+        word_timestamps=timed,  # +0.3 s on 10 s of audio, so only when cutting
     )
-    words, ends = [], []
-    for s in segments:
-        words += s.text.split()
-        ends.append((len(words), s.end))
-    print(f"{'final' if final else 'live'}: {len(audio) / RATE:.1f}s audio in {time.monotonic() - t:.2f}s", flush=True)
-    return words, ends
+    segments = list(segments)
+    # on unclear audio Whisper continues the glossary text, often in a loop
+    bad = any("Glossary" in s.text or s.compression_ratio > 2.4 for s in segments)
+    took = time.monotonic() - t
+    print(f"{'final' if final else 'live'}: {len(audio) / RATE:.1f}s audio in {took:.2f}s{', dropped' if bad else ''}",
+          flush=True)
+    if bad:
+        return transcribe(audio, prompt, final, timed, None) if final and hotwords else None
+    if not timed:
+        return [w for s in segments for w in s.text.split()], []
+    words = [(w.word.strip(), w.start, w.end) for s in segments for w in s.words if w.word.strip()]
+    return [w for w, _, _ in words], [(start, end) for _, start, end in words]
 
 
 def has_speech(audio):
@@ -184,6 +220,7 @@ class Session:
         self.lock = threading.Lock()
         self.released = threading.Event()
         self.closed = threading.Event()
+        self.stopped = threading.Event()
         self.feedback = Feedback(self.released)
         self.rec = subprocess.Popen(
             ["pw-record", "--raw", "--rate", str(RATE), "--channels", "1", "--format", "s16", "-"],
@@ -217,6 +254,11 @@ class Session:
         self.closed.set()
         self.feedback.stop()  # after the mic closes, so the stop sound is not transcribed
 
+    def stop(self):
+        """Type and delete nothing more, the user is editing or clicked elsewhere."""
+        self.stopped.set()
+        self.released.set()
+
     def run(self):
         try:
             with turn:
@@ -230,14 +272,16 @@ class Session:
     def transcribe_loop(self):
         commit = CONFIG["mode"] == "commit"
         need = CONFIG["commit"]["agree"] if commit else CONFIG["correct"]["lock"]
+        append_only = CONFIG["correct"]["keep_on_release"]
         offset = 0      # samples trimmed off the front
         frozen = ""     # text before offset, final
-        history = []    # recent passes, for agreement
+        history = []    # recent passes, the words after the locked ones, for agreement
         locked = []     # words on screen that never change again
+        screen = []     # words on screen after frozen (correct mode)
         typed = ""      # text on screen (correct mode)
         last = 0        # audio length at the last check
         passed = 0      # audio length at the last pass
-        while True:
+        while not self.stopped.is_set():
             final = self.released.is_set()
             if final:
                 self.closed.wait()
@@ -250,46 +294,118 @@ class Session:
             if not final and CONFIG["skip_silence"] and not has_speech(full[max(offset, passed - RATE // 2):]):
                 continue
             passed = len(full)
-            words, ends = transcribe(full[offset:], frozen[-200:], final)
+            over = len(full) - offset
+            # word times only for a pass that can cut, see below
+            timed = not final and over > TRIM_AT * RATE and (bool(locked) or not need or over > 25 * RATE)
+            result = transcribe(full[offset:], frozen[-200:], final, timed)
+            if self.stopped.is_set():
+                return
             if not final and self.released.is_set():
                 continue  # released during this pass; the final pass replaces it right away
-            history = (history + [words])[-max(need, 2):]
+            if result is None:  # echoed the glossary or looped: leave the screen as it is
+                if final:
+                    break
+                continue
+            words, times = result
+            if final and not commit and append_only:
+                add = appended(screen, words)
+                typed = replace(typed, typed + (add.lstrip() if not typed or typed.endswith(" ") else add))
+                break
+            k = align(locked, words)
+            if k is None:  # can't tell where the locked words end in this pass
+                if final:
+                    break
+                continue
+            tail = words[k:]
+            shown = locked + tail
+            history = (history + [tail])[-max(need, 2):]
             if final:
-                stable = words
+                stable = tail
             elif need and len(history) >= need:
                 # the last word may be unfinished ("stor", "the..."), so it never freezes before release
-                stable = agreed(history[-need:])[: len(words) - 1]
+                stable = agreed(history[-need:])[: len(tail) - 1]
             else:
                 stable = []
-            if len(stable) > len(locked):
-                new = stable[len(locked):]
-                locked += new
+            if stable:
+                locked += stable
+                history = [h[len(stable):] for h in history]
                 if commit:
-                    type_text(" ".join(new) + " ")
-            shown = locked + words[len(locked):]
+                    type_text(" ".join(stable) + " ")
             if not commit:
-                text = frozen + " ".join(shown)
+                text = " ".join(shown)
                 if not final:
                     text = text.rstrip(".-…")  # live guesses often end in "." "..." or "-" that the next pass drops
-                typed = replace(typed, text + " " if final and shown else text)
+                screen = text.split()
+                typed = replace(typed, frozen + text)
             if final:
-                return
-            if len(full) - offset > TRIM_AT * RATE:
-                keep = len(locked) if need else len(agreed(history[-2:]))
-                cuts = [(n, end) for n, end in ends if 0 < n <= keep]
-                if cuts:
-                    n, end = cuts[-1]
-                    offset += int(end * RATE)
+                break
+            if timed:
+                # cut after the locked words; with none, after the agreed ones (lock = 0, or past 25 s)
+                extra = 0
+                if not locked and (not need or over > 25 * RATE) and len(history) >= 2:
+                    extra = len(agreed(history[-2:])[: len(history[-1]) - 1])
+                n = len(locked) + extra
+                if n:
+                    e = k + len(stable) + extra  # words[:e] are the ones cut
+                    cut = times[e - 1][1]
+                    if e < len(times):
+                        cut = (cut + times[e][0]) / 2
+                    offset += int(cut * RATE)
                     frozen += " ".join(shown[:n]) + " "
-                    locked = locked[n:]
-                    history = [h[n:] for h in history]
+                    screen = screen[n:]
+                    locked = []
+                    history = [h[extra:] for h in history]
+        if typed and not typed.endswith(" ") and not self.stopped.is_set():
+            type_text(" ")
+
+
+def norm(word):
+    return word.lower().strip(".,?!…-:;\"")
 
 
 def agreed(hyps):
     n = 0
-    while n < min(map(len, hyps)) and all(h[n] == hyps[0][n] for h in hyps):
+    while n < min(map(len, hyps)) and len({norm(h[n]) for h in hyps}) == 1:
         n += 1
-    return hyps[0][:n]
+    return hyps[-1][:n]
+
+
+def align(done, words):
+    """Index in words right after the part that matches done, or None.
+
+    Passes split the same speech differently ("set up" vs "setup", an extra "So,"),
+    so the end of done is found by its last letters, not by its word count.
+    """
+    key = "".join(map(norm, done))[-12:]
+    if not key:
+        return 0
+    ends, text = [], ""
+    for i, w in enumerate(words, 1):
+        text += norm(w)
+        if text.endswith(key):
+            ends.append(i)
+    return min(ends, key=lambda i: abs(i - len(done)), default=None)
+
+
+def appended(screen, words):
+    """What to type after the screen so it ends like words, or "" if they don't line up."""
+    if not screen:
+        return " ".join(words)
+    for j in range(1, min(3, len(screen)) + 1):
+        k = align(screen[:-j], words)
+        if k is not None:
+            k += j - 1  # the words in between may differ ("chuck" vs "check"); they stay as shown
+            break
+    if k is None or k >= len(words):
+        return ""
+    word, last = words[k], screen[-1]
+    if word.lower().startswith(last.lower()):
+        rest = word[len(last):]  # "stor" -> "storage." types "age.", "logs" -> "logs." types "."
+    elif norm(word) == norm(last):
+        rest = ""
+    else:
+        return ""
+    return rest + "".join(" " + w for w in words[k + 1:])
 
 
 def scan(devices, rejected):
@@ -304,7 +420,7 @@ def scan(devices, rejected):
             dev = evdev.InputDevice(path)
         except OSError:
             continue
-        if KEY in dev.capabilities().get(EV_KEY, []):
+        if WATCH & set(dev.capabilities().get(EV_KEY, [])):
             devices[path] = dev
         else:
             rejected.add(stamp)
@@ -316,8 +432,7 @@ def check():
     for ok, what in ((os.environ.get("WAYLAND_DISPLAY"), "WAYLAND_DISPLAY"), (shutil.which("wtype"), "wtype"),
                      (shutil.which("pw-record"), "pw-record")):
         if not ok:
-            print(f"{what} not found", file=sys.stderr)
-            sys.exit(2)  # the service does not restart on 2
+            die(f"{what} not found")
 
     def off(name, why):
         if CONFIG[name]:
@@ -344,13 +459,17 @@ def check():
 
 def main():
     check()
+    load_model()
     devices, rejected, session = {}, set(), None
     scan(devices, rejected)
     if not devices:
         print(f"no readable device has {CONFIG['key']} yet; is the user in the input group?", flush=True)
     print(f"ready: {CONFIG}, words: {WORDS}", flush=True)
+    next_scan = 0
     while True:
-        scan(devices, rejected)  # picks up keyboards plugged in later, incl. the debounce virtual one
+        if time.monotonic() >= next_scan:  # not on every wakeup, a moving mouse wakes this 1000 times a second
+            scan(devices, rejected)  # picks up keyboards plugged in later, incl. the debounce virtual one
+            next_scan = time.monotonic() + 2
         ready, _, _ = select.select(list(devices.values()), [], [], 2)
         for dev in ready:
             try:
@@ -363,7 +482,11 @@ def main():
                     session.released.set()
                 continue
             for ev in events:
-                if ev.type != EV_KEY or ev.code != KEY:
+                if ev.type != EV_KEY:
+                    continue
+                if ev.code != KEY:
+                    if ev.value == 1 and session and CONFIG["stop_on_input"]:
+                        session.stop()  # another key or a click: more typing could land on the user's edit
                     continue
                 if ev.value == 1 and (session is None or session.released.is_set()):
                     session = Session()

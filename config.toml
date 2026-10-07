@@ -37,6 +37,10 @@ model = "large-v3-turbo"
 # float16 is slow on Pascal cards, avoid.
 compute_type = "int8"
 
+# Stop a dictation when another key or a mouse button goes down, while held or after release.
+# Nothing more is typed or deleted, so it can't hit your edits. true or false, recommended true.
+stop_on_input = true
+
 # ==== Speed and accuracy ===========================================================
 
 # Seconds of new audio between live passes. Range 0.2-2.0, recommended 0.5.
@@ -63,7 +67,7 @@ tail = 0.2
 # Range 0.1-1.0, recommended 0.3.
 min_audio = 0.3
 
-# Seconds of audio before finished sentences are locked and dropped from re-transcription.
+# Seconds of audio before settled words are dropped from re-transcription.
 # Range 8-25, recommended 20. Lower means fewer big rewrites on long dictation; keep under 30.
 trim_at = 8
 
@@ -75,7 +79,7 @@ max_hold = 300
 # saves GPU, and makes release after a pause faster. true or false, recommended true.
 skip_silence = true
 
-# ==== Per=mode settings. Sections must stay at the end of the file =================
+# ==== Per-mode settings. Sections must stay at the end of the file =================
 
 [commit]
 # Passes that must agree on a word before it is typed. Range 2-4, recommended 2.
@@ -87,3 +91,7 @@ agree = 2
 # A word freezes roughly lock x 0.5 s after you say it; only words after it can still change.
 # 0 = never freeze, any word can be rewritten. 2 = freeze fast, short rewrites. 3-4 = later, more chances to fix.
 lock = 3
+
+# On release, keep the words on screen and only type what is missing at the end. Never backspaces.
+# false lets the final pass rewrite words that are not frozen. true or false, recommended true.
+keep_on_release = true

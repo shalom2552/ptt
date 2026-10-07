@@ -20,8 +20,8 @@ if [[ ${1:-} == --uninstall ]]; then
     say "remove the ptt service and links, $VENV, $CONF and the Whisper models:"
     printf '    %s\n' "${models[@]}"
     say "packages and the input group stay, other things may use them"
-    read -rp "Proceed? [n/Y] " answer
-    [[ ${answer,,} == n* ]] && exit 0
+    read -rp "Proceed? [y/N] " answer
+    [[ ${answer,,} == y* ]] || exit 0
     systemctl --user disable --now ptt 2>/dev/null || true
     rm -f "$HOME/.local/bin/ptt" "$UNITS/ptt.service"
     systemctl --user daemon-reload
@@ -50,7 +50,8 @@ fi
 
 say "set up the Python env"
 [[ -x $VENV/bin/python ]] || uv venv --python 3.12 "$VENV"
-uv pip install --python "$VENV/bin/python" faster-whisper evdev nvidia-cublas-cu12
+# pinned: a later ctranslate2 built for CUDA 13 would not run on Pascal (GTX 10xx)
+uv pip install --python "$VENV/bin/python" faster-whisper==1.2.1 ctranslate2==4.8.2 nvidia-cublas-cu12==12.9.2.10 evdev
 
 mkdir -p "$CONF" "$UNITS" "$HOME/.local/bin"
 for f in config.toml words.txt; do
