@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# install - set up ptt: packages, input group, Python env, model, links, service.
+set -Eeuo pipefail
+
+ROOT="$(dirname "$(readlink -f "$0")")"
+VENV="$HOME/.local/share/ptt/venv"
+CONF="$HOME/.config/ptt"
+UNITS="$HOME/.config/systemd/user"
+
+say() { printf '\e[1;36m[ptt]\e[0m %s\n' "$*"; }
+die() {
+    printf '\e[1;31m[ptt]\e[0m %s\n' "$*" >&2
+    exit 1
+}
+trap 'die "failed on line $LINENO: $BASH_COMMAND"' ERR
+
+if [[ ${1:-} == --uninstall ]]; then
+    shopt -s nullglob
+    models=("${HF_HOME:-$HOME/.cache/huggingface}"/hub/models--*--faster-whisper-*)
+    say "remove the ptt service and links, $VENV, $CONF and the Whisper models:"
+    printf '    %s\n' "${models[@]}"
+    say "packages and the input group stay, other things may use them"
+    read -rp "Proceed? [n/Y] " answer
+    [[ ${answer,,} == n* ]] && exit 0
+    systemctl --user disable --now ptt 2>/dev/null || true
+    rm -f "$HOME/.local/bin/ptt" "$UNITS/ptt.service"
+    systemctl --user daemon-reload
+    rm -rf "${VENV%/venv}" "$CONF" "${models[@]}"
+    say "done"
+    exit 0
+fi
+
+command -v nvidia-smi >/dev/null || die "no NVIDIA driver found"
+
+if command -v pacman >/dev/null; then
+    say "install the packages"
+    sudo pacman -S --needed wtype pipewire uv gcc swayosd sound-theme-freedesktop
+else
+    for cmd in wtype pw-record uv gcc; do
+        command -v "$cmd" >/dev/null || die "$cmd is not installed"
+    done
+fi
+
+relogin=0
+if ! id -nG "$USER" | grep -qw input; then
+    say "join the input group, ptt reads the key from /dev/input"
+    sudo gpasswd -a "$USER" input
+    relogin=1
+fi
+
+say "set up the Python env"
+[[ -x $VENV/bin/python ]] || uv venv --python 3.12 "$VENV"
+uv pip install --python "$VENV/bin/python" faster-whisper evdev nvidia-cublas-cu12
+
+mkdir -p "$CONF" "$UNITS" "$HOME/.local/bin"
+for f in config.toml words.txt; do
+    [[ -e $CONF/$f ]] || cp "$ROOT/$f" "$CONF/$f"
+done
+
+model="$(sed -n 's/^model = "\([^"]*\)".*/\1/p' "$CONF/config.toml")"
+model="${model:-large-v3-turbo}"
+say "download the $model model, once"
+"$VENV/bin/python" -c 'import sys; from faster_whisper import download_model; download_model(sys.argv[1])' "$model"
+
+say "link ptt and its service, then start it"
+ln -sfn "$ROOT/ptt" "$HOME/.local/bin/ptt"
+ln -sfn "$ROOT/ptt.service" "$UNITS/ptt.service"
+systemctl --user daemon-reload
+systemctl --user enable ptt
+systemctl --user restart ptt
+
+say "done. Hold Pause and talk. Keep Pause away from apps, in Hyprland:"
+printf '    hl.bind("Pause", hl.dsp.exec_cmd("true"))\n'
+if ((relogin)); then
+    say "log out and back in first, for the input group"
+fi

@@ -1,0 +1,14 @@
+[Unit]
+Description=ptt push-to-talk dictation
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/ptt
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=3
+RestartPreventExitStatus=2
+
+[Install]
+WantedBy=graphical-session.target

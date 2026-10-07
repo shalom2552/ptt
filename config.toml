@@ -1,0 +1,89 @@
+# ptt config. Changes apply after: systemctl --user restart ptt
+
+# ==== Visual and sound feedback while the key is held ==============================
+osd = true
+osd_icon = "audio-input-microphone-symbolic" # any freedesktop icon name
+osd_text = "Listening"
+osd_release_text = "Done" # shown for 0.5 s after release
+
+border = true
+border_color = "rgba(ff3355ee)" # Hyprland color, rgba(RRGGBBAA)
+
+sound = true
+sound_start = "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+sound_stop = "/usr/share/sounds/freedesktop/stereo/dialog-information.oga"
+sound_volume = 0.5 # 0.0-1.0
+
+# ==== General ======================================================================
+
+# Push-to-talk key, as an evdev name.
+# Find a key's name with: ~/.local/share/ptt/venv/bin/python -m evdev.evtest
+# Also move the no-op key bind in the compositor config to match (see README).
+key = "KEY_PAUSE"
+
+# How live text is typed while the key is held.
+# "correct": types guesses right away, fixes them with backspaces. Fast, can rewrite a lot.
+# "commit": types a word only once enough passes agree, never deletes. About 1-2 s behind.
+# Per-mode settings are in the [commit] and [correct] sections at the end of this file.
+mode = "correct"
+
+# Whisper model. A new one downloads on the next start, needs internet once.
+# large-v3-turbo: best accuracy, ~0.5 s per pass on the GTX 1080. Recommended.
+# distil-medium.en, small.en, base.en: faster, less accurate.
+model = "large-v3-turbo"
+
+# Number format on the GPU.
+# int8: recommended on the GTX 1080. float32: slower, no accuracy gain worth it.
+# float16 is slow on Pascal cards, avoid.
+compute_type = "int8"
+
+# ==== Speed and accuracy ===========================================================
+
+# Seconds of new audio between live passes. Range 0.2-2.0, recommended 0.5.
+# Lower means snappier text but more GPU work; below the pass time (~0.5 s) gains little.
+step = 0.2
+
+# Beam = how many candidate sentences Whisper compares before picking one.
+# 1 takes the most likely word each time and never looks back; 5 keeps 5 versions and picks the best.
+# Example: "I scream for ice cream" -> beam 1 may lock in "Ice cream...", beam 5 can still recover "I scream...".
+
+# Beam while you talk. Range 1-5, recommended 1.
+# Live text gets replaced anyway, so speed matters more here.
+live_beam = 1
+
+# Beam for the final pass after release. Range 1-5, recommended 5.
+# Setting 1 makes release a bit faster, with slightly more wrong words.
+final_beam = 5
+
+# Seconds to keep recording after release, so the last word is not cut off.
+# Range 0.0-0.5, recommended 0.2. Lower if release feels slow and words are not clipped.
+tail = 0.2
+
+# Presses shorter than this many seconds are ignored, to avoid "Thank you." on taps.
+# Range 0.1-1.0, recommended 0.3.
+min_audio = 0.3
+
+# Seconds of audio before finished sentences are locked and dropped from re-transcription.
+# Range 8-25, recommended 20. Lower means fewer big rewrites on long dictation; keep under 30.
+trim_at = 8
+
+# Safety cap in seconds: a session stops on its own if a key release is never seen.
+# Range 30-600, recommended 120.
+max_hold = 300
+
+# Skip live passes while you are silent. Stops half-said words ("the...") freezing during pauses,
+# saves GPU, and makes release after a pause faster. true or false, recommended true.
+skip_silence = true
+
+# ==== Per=mode settings. Sections must stay at the end of the file =================
+
+[commit]
+# Passes that must agree on a word before it is typed. Range 2-4, recommended 2.
+# Higher means fewer wrong words but more lag (each extra pass adds ~0.5 s).
+agree = 2
+
+[correct]
+# Passes in a row that must agree on a word before it is frozen (never backspaced again).
+# A word freezes roughly lock x 0.5 s after you say it; only words after it can still change.
+# 0 = never freeze, any word can be rewritten. 2 = freeze fast, short rewrites. 3-4 = later, more chances to fix.
+lock = 3

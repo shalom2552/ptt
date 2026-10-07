@@ -1,0 +1,375 @@
+#!/usr/bin/env -S ${HOME}/.local/share/ptt/venv/bin/python
+"""ptt: hold a key, speak, words are typed live into the focused window."""
+import ctypes
+import glob
+import json
+import os
+import select
+import shutil
+import subprocess
+import sys
+import threading
+import time
+import tomllib
+import traceback
+
+# ctranslate2 dlopens cuBLAS 12 from the venv; the loader reads LD_LIBRARY_PATH only at startup.
+LIBS = glob.glob(f"{sys.prefix}/lib/python*/site-packages/nvidia/*/lib")
+if LIBS and LIBS[0] not in os.environ.get("LD_LIBRARY_PATH", ""):
+    os.environ["LD_LIBRARY_PATH"] = ":".join(LIBS + [os.environ.get("LD_LIBRARY_PATH", "")])
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+import evdev
+import numpy as np
+from faster_whisper import WhisperModel
+from faster_whisper.vad import get_speech_timestamps
+
+CONFIG = {
+    "key": "KEY_PAUSE",
+    "mode": "commit",
+    "model": "large-v3-turbo",
+    "compute_type": "int8",
+    "step": 0.5,
+    "live_beam": 1,
+    "final_beam": 5,
+    "tail": 0.2,
+    "min_audio": 0.3,
+    "trim_at": 20,
+    "max_hold": 120,
+    "skip_silence": True,
+    "osd": True,
+    "osd_icon": "audio-input-microphone-symbolic",
+    "osd_text": "Listening",
+    "osd_release_text": "Done",
+    "border": True,
+    "border_color": "rgba(ff3355ee)",
+    "sound": True,
+    "sound_start": "/usr/share/sounds/freedesktop/stereo/device-added.oga",
+    "sound_stop": "/usr/share/sounds/freedesktop/stereo/device-removed.oga",
+    "sound_volume": 0.5,
+    "commit": {"agree": 2},
+    "correct": {"lock": 0},
+}
+CONFIG_PATH = os.path.expanduser("~/.config/ptt/config.toml")
+if os.path.exists(CONFIG_PATH):
+    with open(CONFIG_PATH, "rb") as f:
+        for k, v in tomllib.load(f).items():
+            CONFIG[k] = CONFIG[k] | v if isinstance(v, dict) else v
+
+WORDS_PATH = os.path.expanduser("~/.config/ptt/words.txt")
+WORDS = []
+if os.path.exists(WORDS_PATH):
+    with open(WORDS_PATH) as f:
+        WORDS = [w.strip() for w in f if w.strip() and not w.startswith("#")]
+# a sentence keeps Whisper's capitals and punctuation; a bare word list makes it drop them
+HOTWORDS = "Glossary: " + ", ".join(WORDS) + "." if WORDS else None
+
+RATE = 16000
+STEP = CONFIG["step"]
+TRIM_AT = CONFIG["trim_at"]
+MAX_HOLD = CONFIG["max_hold"]
+KEY = evdev.ecodes.ecodes[CONFIG["key"]]
+EV_KEY = evdev.ecodes.EV_KEY
+
+try:
+    model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"], local_files_only=True)
+except FileNotFoundError:
+    print(f"downloading the {CONFIG['model']} model", flush=True)
+    model = WhisperModel(CONFIG["model"], device="cuda", compute_type=CONFIG["compute_type"])
+list(model.transcribe(np.zeros(RATE, np.float32), language="en")[0])
+get_speech_timestamps(np.zeros(RATE, np.float32))
+libc = ctypes.CDLL("libc.so.6")
+libc.malloc_trim(0)  # loading leaves ~800 MB of freed heap that glibc keeps
+turn = threading.Lock()  # one session transcribes and types at a time, in press order
+
+
+def transcribe(audio, prompt, final):
+    if len(audio) < CONFIG["min_audio"] * RATE:
+        return [], []
+    t = time.monotonic()
+    segments, _ = model.transcribe(
+        audio,
+        language="en",
+        beam_size=CONFIG["final_beam"] if final else CONFIG["live_beam"],
+        initial_prompt=prompt or None,
+        hotwords=HOTWORDS,
+        condition_on_previous_text=False,
+        vad_filter=True,
+    )
+    words, ends = [], []
+    for s in segments:
+        words += s.text.split()
+        ends.append((len(words), s.end))
+    print(f"{'final' if final else 'live'}: {len(audio) / RATE:.1f}s audio in {time.monotonic() - t:.2f}s", flush=True)
+    return words, ends
+
+
+def has_speech(audio):
+    return bool(get_speech_timestamps(audio))
+
+
+def type_text(text):
+    subprocess.run(["wtype", "-"], input=text, text=True, check=False)
+
+
+def replace(old, new):
+    n = len(os.path.commonprefix([old, new]))
+    if old[n:] or new[n:]:
+        subprocess.run(["wtype"] + ["-k", "BackSpace"] * (len(old) - n) + ["-"], input=new[n:], text=True, check=False)
+    return new
+
+
+def quiet(cmd):
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def hypr_border(colors, angle=0):
+    lua = "{" + ",".join(f'"{c}"' for c in colors) + "}"
+    subprocess.run(
+        ["hyprctl", "eval", f"hl.config({{general={{col={{active_border={{colors={lua},angle={angle}}}}}}}}})"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def hypr_border_now():
+    out = subprocess.run(["hyprctl", "getoption", "general:col.active_border", "-j"], capture_output=True, text=True)
+    *colors, angle = json.loads(out.stdout)["gradient"].split()
+    # hyprctl reports AARRGGBB; the config takes rgba(RRGGBBAA)
+    return [f"rgba({c[2:]}{c[:2]})" for c in colors], int(float(angle.removesuffix("deg")))
+
+
+class Feedback:
+    """OSD, border and sound while the key is held."""
+
+    border = None  # the configured border, shared so overlapping sessions restore the right one
+
+    def __init__(self, released):
+        self.released = released
+        self.starter = threading.Thread(target=self.start, daemon=True)
+        self.starter.start()
+
+    def osd(self, duration):
+        quiet(["swayosd-client", "--custom-icon", CONFIG["osd_icon"], "--custom-message", CONFIG["osd_text"],
+               "--duration", str(duration)])
+
+    def start(self):
+        if CONFIG["sound"]:
+            quiet(["pw-play", "--volume", str(CONFIG["sound_volume"]), CONFIG["sound_start"]])
+        if CONFIG["border"]:
+            current = hypr_border_now()
+            if current[0] != [CONFIG["border_color"]]:
+                Feedback.border = current
+            hypr_border([CONFIG["border_color"]])
+        if CONFIG["osd"]:
+            # swayosd shifts the text when a message is resent while shown, so send one long one
+            self.osd(60000)
+            while not self.released.wait(55):
+                self.osd(60000)
+
+    def stop(self):
+        self.starter.join()
+        if CONFIG["osd"]:
+            # swayosd has no hide, and resending the same popup shifts it; a popup without an icon replaces it cleanly
+            quiet(["swayosd-client", "--custom-message", CONFIG["osd_release_text"], "--duration", "500"])
+        if CONFIG["border"] and Feedback.border:
+            hypr_border(*Feedback.border)
+        if CONFIG["sound"]:
+            quiet(["pw-play", "--volume", str(CONFIG["sound_volume"]), CONFIG["sound_stop"]])
+
+
+class Session:
+    def __init__(self):
+        self.chunks = []
+        self.lock = threading.Lock()
+        self.released = threading.Event()
+        self.closed = threading.Event()
+        self.feedback = Feedback(self.released)
+        self.rec = subprocess.Popen(
+            ["pw-record", "--raw", "--rate", str(RATE), "--channels", "1", "--format", "s16", "-"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        self.reader = threading.Thread(target=self.read, daemon=True)
+        self.reader.start()
+        threading.Thread(target=self.stop_recording, daemon=True).start()
+        threading.Thread(target=self.run, daemon=True).start()
+
+    def read(self):
+        while data := self.rec.stdout.read(3200):
+            with self.lock:
+                self.chunks.append(np.frombuffer(data[: len(data) // 2 * 2], np.int16))
+
+    def audio(self):
+        with self.lock:
+            if not self.chunks:
+                return np.zeros(0, np.float32)
+            return np.concatenate(self.chunks).astype(np.float32) / 32768
+
+    def stop_recording(self):
+        # own thread, so the mic closes on release even while a pass is still running
+        self.released.wait(MAX_HOLD)  # safety cap if a key release is never seen
+        self.released.set()
+        time.sleep(CONFIG["tail"])
+        self.rec.terminate()
+        self.rec.wait()
+        self.reader.join()
+        self.closed.set()
+        self.feedback.stop()  # after the mic closes, so the stop sound is not transcribed
+
+    def run(self):
+        try:
+            with turn:
+                self.transcribe_loop()
+        except Exception:
+            traceback.print_exc()
+        finally:
+            self.released.set()
+            libc.malloc_trim(0)
+
+    def transcribe_loop(self):
+        commit = CONFIG["mode"] == "commit"
+        need = CONFIG["commit"]["agree"] if commit else CONFIG["correct"]["lock"]
+        offset = 0      # samples trimmed off the front
+        frozen = ""     # text before offset, final
+        history = []    # recent passes, for agreement
+        locked = []     # words on screen that never change again
+        typed = ""      # text on screen (correct mode)
+        last = 0        # audio length at the last check
+        passed = 0      # audio length at the last pass
+        while True:
+            final = self.released.is_set()
+            if final:
+                self.closed.wait()
+            full = self.audio()
+            if not final and len(full) - last < STEP * RATE:
+                time.sleep(0.05)
+                continue
+            last = len(full)
+            # silence adds nothing, and repeated passes over it would agree and freeze half-said words
+            if not final and CONFIG["skip_silence"] and not has_speech(full[max(offset, passed - RATE // 2):]):
+                continue
+            passed = len(full)
+            words, ends = transcribe(full[offset:], frozen[-200:], final)
+            if not final and self.released.is_set():
+                continue  # released during this pass; the final pass replaces it right away
+            history = (history + [words])[-max(need, 2):]
+            if final:
+                stable = words
+            elif need and len(history) >= need:
+                # the last word may be unfinished ("stor", "the..."), so it never freezes before release
+                stable = agreed(history[-need:])[: len(words) - 1]
+            else:
+                stable = []
+            if len(stable) > len(locked):
+                new = stable[len(locked):]
+                locked += new
+                if commit:
+                    type_text(" ".join(new) + " ")
+            shown = locked + words[len(locked):]
+            if not commit:
+                text = frozen + " ".join(shown)
+                if not final:
+                    text = text.rstrip(".-…")  # live guesses often end in "." "..." or "-" that the next pass drops
+                typed = replace(typed, text + " " if final and shown else text)
+            if final:
+                return
+            if len(full) - offset > TRIM_AT * RATE:
+                keep = len(locked) if need else len(agreed(history[-2:]))
+                cuts = [(n, end) for n, end in ends if 0 < n <= keep]
+                if cuts:
+                    n, end = cuts[-1]
+                    offset += int(end * RATE)
+                    frozen += " ".join(shown[:n]) + " "
+                    locked = locked[n:]
+                    history = [h[n:] for h in history]
+
+
+def agreed(hyps):
+    n = 0
+    while n < min(map(len, hyps)) and all(h[n] == hyps[0][n] for h in hyps):
+        n += 1
+    return hyps[0][:n]
+
+
+def scan(devices, rejected):
+    for path in evdev.list_devices():
+        if path in devices:
+            continue
+        try:
+            # ctime changes when the node is recreated, so a new device on a reused path is still checked
+            stamp = (path, os.stat(path).st_ctime_ns)
+            if stamp in rejected:
+                continue
+            dev = evdev.InputDevice(path)
+        except OSError:
+            continue
+        if KEY in dev.capabilities().get(EV_KEY, []):
+            devices[path] = dev
+        else:
+            rejected.add(stamp)
+            dev.close()
+
+
+def check():
+    """Exit if a must-have is missing; turn off feedback whose tools are missing."""
+    for ok, what in ((os.environ.get("WAYLAND_DISPLAY"), "WAYLAND_DISPLAY"), (shutil.which("wtype"), "wtype"),
+                     (shutil.which("pw-record"), "pw-record")):
+        if not ok:
+            print(f"{what} not found", file=sys.stderr)
+            sys.exit(2)  # the service does not restart on 2
+
+    def off(name, why):
+        if CONFIG[name]:
+            print(f"{name} off: {why}", flush=True)
+            CONFIG[name] = False
+
+    if not shutil.which("pw-play"):
+        off("sound", "pw-play not found")
+    for sound in ("sound_start", "sound_stop"):
+        if CONFIG["sound"] and not os.path.isfile(CONFIG[sound]):
+            print(f"{sound} not found, plays nothing: {CONFIG[sound]}", flush=True)
+    if not shutil.which("swayosd-client"):
+        off("osd", "swayosd-client not found")
+    if CONFIG["border"]:
+        try:
+            border = hypr_border_now()
+        except (OSError, ValueError, KeyError):
+            off("border", "cannot read the Hyprland border")
+        else:
+            # a crash mid-press leaves the recording color on; reload restores the configured one
+            if border[0] == [CONFIG["border_color"]]:
+                subprocess.run(["hyprctl", "reload", "config-only"], stdout=subprocess.DEVNULL)
+
+
+def main():
+    check()
+    devices, rejected, session = {}, set(), None
+    scan(devices, rejected)
+    if not devices:
+        print(f"no readable device has {CONFIG['key']} yet; is the user in the input group?", flush=True)
+    print(f"ready: {CONFIG}, words: {WORDS}", flush=True)
+    while True:
+        scan(devices, rejected)  # picks up keyboards plugged in later, incl. the debounce virtual one
+        ready, _, _ = select.select(list(devices.values()), [], [], 2)
+        for dev in ready:
+            try:
+                events = list(dev.read())
+            except BlockingIOError:
+                continue
+            except OSError:
+                devices.pop(dev.path, None)
+                if session:
+                    session.released.set()
+                continue
+            for ev in events:
+                if ev.type != EV_KEY or ev.code != KEY:
+                    continue
+                if ev.value == 1 and (session is None or session.released.is_set()):
+                    session = Session()
+                elif ev.value == 0 and session:
+                    session.released.set()
+
+
+if __name__ == "__main__":
+    main()

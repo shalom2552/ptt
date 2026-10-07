@@ -1,0 +1,10 @@
+# Words Whisper should expect, one per line, spelled the way you want them typed.
+# Names, tools, jargon. Keep it under ~100 words. Changes apply after: systemctl --user restart ptt
+Hyprland
+nvim
+tmux
+lazygit
+kitty
+yazi
+btop
+systemd
