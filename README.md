@@ -4,6 +4,10 @@ Push to talk voice typing on Wayland, with Whisper on an NVIDIA GPU. Hold a
 key and speak, and the words are typed live at the cursor, in whatever window
 has focus. Fully offline.
 
+|  |
+| :-: |
+| ![demo](demo.gif) |
+
 ## How it works
 
 - `ptt` is a small Python daemon run by a systemd user service. It keeps
@@ -34,7 +38,7 @@ Anything optional that is missing turns itself off, and the log says so.
 ## Install
 
 ```bash
-git clone -b whisper https://github.com/shalom2552/ptt.git ~/Projects/ptt
+git clone https://github.com/shalom2552/ptt.git ~/Projects/ptt
 ~/Projects/ptt/install
 ```
 
