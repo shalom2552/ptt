@@ -262,6 +262,8 @@ class Session:
     def run(self):
         try:
             with turn:
+                # Hyprland 0.57 drops the first virtual key while the bound ptt key is held
+                subprocess.run(["wtype", "-k", "Shift_L"], check=False)
                 self.transcribe_loop()
         except Exception:
             traceback.print_exc()
